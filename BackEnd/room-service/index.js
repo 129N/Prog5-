@@ -70,6 +70,7 @@ io.on('connection', (socket)=> {
         const msg = {username, message};
         rooms[roomId].messages.push(msg);
         io.to(roomId).emit('chat_message', msg);
+          console.log(`💬 ${username} in ${roomId}: ${message}`);
     });
 
     socket.on('leave_room', ({roomId, username})=>{

@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react'
 
 import './App.css'
 import{ io }from "socket.io-client";
+import { useNavigate } from 'react-router-dom';
 
 
 // temporary the localhost is used/
 const socket = io("http://localhost:3002", {transports: ["websocket"]});
 
-function App() {
+function App_main() {
 
+const navigate = useNavigate();
 
   const [username, setUserName] = useState ("");
   const [roomId, setRoomId] = useState(""); //from index.js of user-service 
@@ -47,8 +49,8 @@ function App() {
 
 
   const createRoom = async() => {
-    if(!username){
-      alert("Please type your name!");
+    if(!roomName || !username){
+      alert("Please fill the blunk!");
       return;
     }
 
@@ -57,16 +59,24 @@ function App() {
         const res = await fetch("http://localhost:3002/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ roomName }),
+          body: JSON.stringify({ roomName, username }),
         });
 
         const data = await res.json();
-
+      console.log("Backend response:", data); // 👈 debug here
+      
       if(data.success){
         console.log("✅ Room created:", data);
         alert(`Room "${data.roomName}" created successfully!`);
-        setRoomId(data.roomName); // optional: auto-fill roomId field
+
+        localStorage.setItem("username", username);
+        setUserName(username);
+        setRoomId(data.roomId); // optional: auto-fill roomId field
+        setRoomName(data.roomName);
+        // setUserName(data.username);
         setCreated(true);
+
+        socket.emit("join_room", { roomId: data.roomId, username });
       }
 
     }
@@ -86,6 +96,7 @@ function App() {
 
   const sendMSG = () => {
      if (messageInput.trim()) {
+      console.log("📤 Sending message:", messageInput);
       socket.emit("chat_message", {
         roomId,
         username,
@@ -111,6 +122,11 @@ function App() {
 {!connected ? (
 
         <div>
+          <input
+            placeholder="Enter your name"
+            value={username}
+            onChange={(e) => setUserName(e.target.value)}
+          />
           <input
             placeholder="Enter new room name"
             value={roomName}
@@ -182,4 +198,4 @@ function App() {
   );
 }
 
-export default App;
+export default App_main;
