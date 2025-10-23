@@ -1,6 +1,6 @@
 
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { cache, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { socket } from "./socket";
 
@@ -22,7 +22,14 @@ export default function LobbyRoom(){
   const [messages, setMessages] = useState<Message[]>([]);
   const [players, setPlayers] = useState<String[]>([]);
   const [messageInput, setMessageInput] = useState("");
+
+    const [roomBlunkId, setRoomId] = useState(""); //from index.js of user-service 
+
+    const [isReady, setIsReady] = useState(false);
+
     // const [SC, setSocket] = useState<Socket | null>(null);
+
+    const navigate = useNavigate();
 
 
 useEffect(() => {
@@ -50,7 +57,7 @@ useEffect(() => {
 }, [roomId, username]);
 
 
-  const sendMSG = () => {
+  const sendMSG = async() => {
      if (messageInput.trim() && socket) {
           console.log("📤 Sending message:", messageInput); // debug log
       socket.emit("chat_message", {
@@ -61,6 +68,69 @@ useEffect(() => {
       setMessageInput("");
     }
   };
+
+
+  const Gameroom = async() =>{
+
+    if(!roomId || !username){
+      alert("Please fill the blunk!");
+      return;
+    }
+
+    // try{
+    //   const response = await fetch(`http://localhost:3003/start`,  {
+    //       method: "POST",
+    //       headers: { "Content-Type": "application/json" },
+    //       body: JSON.stringify({ roomId, username }),
+    //     });
+
+    //     const data = await response.json();
+    //   console.log("Backend response:", data); // 👈 debug here
+      
+    //   if(response.ok && data.success){
+
+    //      // Save username globally before navigation
+    //     localStorage.setItem("username", username);
+    //     setUserName(username);
+
+    //     //join the gameroom
+    //     socket.emit("player_ready_join", {roomId, username});
+    //     navigate(`/Gameroom/${roomId}`);
+    //   }
+
+    //   else {
+    //   console.error("Failed to start game:", data);
+    //   alert("⚠️ Failed to start the game. Please try again.");
+    //   }
+
+    // } 
+    // catch (error) {
+    //     console.error("Error starting game:", error);
+    //     alert("⚠️ Error connecting to game server.");
+    // }  
+
+
+  navigate(`/Gameroom/${roomId}`);
+
+  };
+
+
+  const leaveRoom = async() => {
+      if (username && roomId) {
+      socket.emit("leave_room", { roomId, username });
+      navigate("/");
+      socket.disconnect();
+    }
+  }
+
+
+const handleReady = () => {
+  if (!roomId || !username) return;
+  const newReady = !isReady;
+  setIsReady(newReady);
+  socket.emit("player_ready", { roomId, username, ready: newReady });
+};
+
     return(
         <>
         <div style={{ padding: "2rem", fontFamily: "Arial" }}>
@@ -97,8 +167,13 @@ useEffect(() => {
           />
           <button onClick={sendMSG}>Send</button>
 
+        <button onClick={handleReady}></button>
+            <input type="button" value="ready?"  onClick={handleReady}/>
+          {isReady ? (<button onClick={Gameroom}>GameRoom</button>
+          ) : ("🕒 Not Ready")}
 
 
+          <button onClick={leaveRoom}>Leave</button>
         </>
     );
 };

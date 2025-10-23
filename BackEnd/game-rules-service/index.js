@@ -23,6 +23,7 @@ let gamerooms = {};
 
 app.post('/start',(req, res)=> {
     const {roomId, players} = req.body;
+    console.log();
     
   if (!roomId || !players || !Array.isArray(players)) {
     return res.status(400).json({ error: 'roomId and players[] are required' });
@@ -49,8 +50,10 @@ io.on('connection', (socket)=> {
     console.log(`⚡ Client connected: ${socket.id}`);
 
 //notification of joining a new player
-    socket.on('join_game', ({roomId, username})=>{
-        if(!gamerooms[roomId]){
+    socket.on('player_ready_join', ({roomId, username})=>{
+
+      const room = gamerooms[roomId];
+        if(!room){
             socket.emit('error', { message: 'Room not found' });
             return;
         }
@@ -61,6 +64,10 @@ io.on('connection', (socket)=> {
         // sends this msg
          io.to(roomId).emit('system_message', `${username} joined the game.`);
     } );
+
+
+
+ 
 
 //send msg 
 socket.on('send_message', ({roomId, username, text}) =>{

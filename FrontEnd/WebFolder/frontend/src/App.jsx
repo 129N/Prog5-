@@ -19,6 +19,7 @@ const navigate = useNavigate();
   const [players, setPlayers] = useState([]);
   const [messageInput, setMessageInput] = useState("");
   const [roomName, setRoomName] = useState("");
+  const [room, setRoom] = useState("");
 
 // boolean
   const [created, setCreated] = useState(false); 
@@ -37,11 +38,16 @@ const navigate = useNavigate();
     });
 
     socket.on("update_players", (list)=> setPlayers(list));
+    
+    socket.on("error", (err)=> {
+      alert(err.message || "Error occured");
+    });
 
     return() => {
       socket.off("system_message");
       socket.off("chat_message");
       socket.off("update_players");
+      socket.off("error");
     };
 
 
@@ -67,13 +73,16 @@ const navigate = useNavigate();
       
       if(data.success){
         console.log("✅ Room created:", data);
-        alert(`Room "${data.roomName}" created successfully!`);
+        alert(`Room ${data.roomName} created successfully!`);
 
+         // Save username globally before navigation
         localStorage.setItem("username", username);
         setUserName(username);
         setRoomId(data.roomId); // optional: auto-fill roomId field
         setRoomName(data.roomName);
         // setUserName(data.username);
+
+        setRoom(room);
         setCreated(true);
 
         socket.emit("join_room", { roomId: data.roomId, username });
@@ -90,8 +99,18 @@ const navigate = useNavigate();
   const handleLogin = async()=> {
      if (username && roomId) {
       socket.emit("join_room", { roomId, username });
-      setConnected(true);
+      navigate(`/room/${roomId}`);
+      // setConnected(true);
     }
+
+    else if(!username || !roomId){
+      alert("Please fill the blunk!");
+    }
+
+    else{
+      alert("FE error");
+    }
+ 
   };
 
   const sendMSG = () => {
