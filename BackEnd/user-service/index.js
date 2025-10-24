@@ -21,29 +21,43 @@ const io = new Server(server, {
 io.on('connection', (socket)=> {
     console.log(`⚡ Client connected: ${socket.id}`);
 
-    socket.io('disconnect', ()=> {
+    socket.on('disconnect', ()=> {
         console.log(`❌ Client disconnected: ${socket.id}`);  
     });
 });
 
 
-let users = [];
+const users = [];
+
+function generateToken(){
+    return Math.random().toString(36).substring(2, 15);
+}
 
 //Register or login 
 app.post('/login', (req, res) => {
+//Generate userId[]
+  const { username } = req.body;
 
-    const {username} = req.body;
-    if(!username) {
-        return res.status(400).json({ error: 'Username is required' });
+  if (!username || username.trim() === "") {
+    return res.status(400).json({ success: false, message: "Username is required" });
+  }
+
+    if(users[username]) {
+        console.log(`♻️ Existing user logged in again: ${username}`);
+        return res.json({success:true, user:users[username]});
     }
 
-//Generate userId
-    const userId = uuidv4();
-    const user = {id: userId, username};
-    users.push(user);
+      // Otherwise create new user
+  const user = {
+    userId: uuidv4(),
+    username,
+    token: generateToken(),
+  };
 
-  console.log(`🧍‍♂️ New user logged in: ${username} (${userId})`);
-    res.json({success : true, user });
+    users[username] = user;
+  console.log(`🧍‍♂️ New user logged in: ${user.username} (${user.userId})`);
+  console.log(`Token : ${user.token}`);
+    return res.json({success : true, user });
 });
 
 //rendering zone 
