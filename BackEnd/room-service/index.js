@@ -21,7 +21,7 @@ const io = new Server(server, {
 const {validate: uuidValidate} = require("uuid");
 
 
-let rooms = [];
+const rooms = [];
 
 //Create a team 
 app.post('/create', (req, res)=> {
@@ -39,19 +39,20 @@ app.post('/create', (req, res)=> {
 
 //websocket real-time connection
 io.on('connection', (socket)=> {
-    console.log(`⚡ Client connected: ${socket.id}`);
+    console.log(`⚡room Client connected: ${socket.id}`);
 
     //join, chat, leave. 
 
     //username is shared with user-service? 
     socket.on('join_room', ({roomId, username}) => {
 
+      //1 : check validation
       if(!uuidValidate(roomId)){
         socket.emit('error', { message: 'BE : Invalid room ID format' });
         return;
       }
+      //2 : after the Id is valid, checks the room being.
       const room = rooms[roomId];
-
         if(!room){
             socket.emit('error', { message: 'BE : Room not found' });
             return;
@@ -64,10 +65,29 @@ io.on('connection', (socket)=> {
           return;
         }
 
+        //prevent duplicates players
+        if(!Array.isArray(room.players)){
+          room.players = [];
+        }
+
+        const alreadyInRooom = room.players.includes(username);
+        if(!alreadyInRooom){
+            room.players.push(username);
+            console.log(`👥 ${username} joined room ${roomId}`);
+        }else{
+          
+        }
+
+
+        
+  // ✅ 4. Valid join — proceed
         socket.join(roomId);
-        room.players.push(username);
+          socket.username = username;
+        // room.players.push(username);
 
         console.log(`👥 ${username} joined room ${roomId}`);
+
+        socket.emit('join_success', { roomId, username });
         io.to(roomId).emit('system_message', `${username} joined the room.`);
         io.to(roomId).emit('update_players', rooms[roomId].players);
     });
@@ -87,18 +107,18 @@ io.on('connection', (socket)=> {
     });
 
        socket.on("player_ready", async ({roomId, username, ready}) => {
-       const room = gamerooms[roomId];
+       const room = rooms[roomId];
         if(!room){
           socket.emit('error', { message: 'Room not found' });
           return;
         }
 
-        if(!room.readyPlater) {
-          room.readyPlater = new Set();
+        if(!room.readyPlayers) {
+          room.readyPlayers = new Set();
         }
 
         if(ready){
-          room.readyPlater.add(username);
+          room.readyPlayers.add(username);
         }else{
           room.readyPlayers.delete(username);
         }
@@ -122,8 +142,10 @@ io.on('connection', (socket)=> {
         console.log("🎮 GameRules Service response:", data);
 
         io.to(roomId).emit("system_message", "🎮 Game starting!");
+        io.to(roomId).emit("game_start", data);
       } catch (err) {
         console.error("❌ Error starting game:", err);
+        alert("the port has not created yet !!");
         io.to(roomId).emit("system messgae", "Failed to start game");
       }
   }
@@ -138,7 +160,7 @@ io.on('connection', (socket)=> {
         socket.leave(roomId);
 
         //Remove Player
-       room.players = rooms[roomId].players.filter(p =>p != username ); 
+       room.players = rooms[roomId].players.filter(p =>p !== username ); 
         if (room.readyPlayers) room.readyPlayers.delete(username);
 
         console.log(`👥 ${username} left room ${roomId}`);
@@ -161,6 +183,17 @@ io.on('connection', (socket)=> {
         console.log(`❌ Client disconnected: ${socket.id}`);  
     });
 });
+
+
+// socket.on("disconnect", () => {
+//   for (const [id, room] of Object.entries(rooms)) {
+//     if (room.players.includes(socket.username)) {
+//       room.players = room.players.filter(p => p !== socket.username);
+//       io.to(id).emit("update_players", room.players);
+//       console.log(`❌ ${socket.username} disconnected from room ${id}`);
+//     }
+//   }
+// });
 
 
 app.get('/', (req, res) => {

@@ -21,6 +21,15 @@ export default function Gameroom() {
     }
   }
 
+  
+  const BackToLobby = async() => {
+      if (username && roomId) {
+      socket.emit("leave_room", { roomId, username });
+      navigate("/room/:roomId");
+      socket.disconnect();
+    }
+  }
+
 useEffect(() => {
   socket.on("connect", () => console.log("✅ Connected to Room Service"));
 
@@ -38,6 +47,7 @@ useEffect(() => {
     socket.off("chat_message");
     socket.off("system_message");
     socket.off("update_players");
+    socket.off("player_ready_join");
   };
 }, [roomId, username]);
 
@@ -48,6 +58,7 @@ useEffect(() => {
             <h2>Your user name is {username}</h2>
             <h2>This room is {roomId}</h2>
         <button onClick={leaveRoom}>Leave</button>
+                <button onClick={BackToLobby}>Back</button>
         </div>
     );
 };

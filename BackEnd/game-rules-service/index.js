@@ -100,6 +100,10 @@ app.get('/', (req, res) => {
     res.send(`User room is running on ${port}`);
 });
 
+app.get('/status', (req, res) => {
+     res.json({ status: "ok", message: "GameRules Service is running" });
+});
+
 server.listen(port, ()=> {
     console.log(`✅ Service started on http://localhost:${port}`);
     // console.log(`the roomId is ${roomId}`);

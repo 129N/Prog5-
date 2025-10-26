@@ -3,15 +3,11 @@ import { cache, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { socket } from "./socket";
-
-
-
 interface Message {
   username: string;
   text?: string;
   message?: string;
 }
-
 
 export default function LobbyRoom(){
 
@@ -35,9 +31,14 @@ export default function LobbyRoom(){
 useEffect(() => {
   socket.on("connect", () => console.log("✅ Connected to Room Service"));
 
-  if (username && roomId) {
-    socket.emit("join_room", { roomId, username });
+    if (!username || !roomId) {
+    return
   }
+  
+    if(roomId && username){
+      socket.emit("join_room", { roomId, username });
+  };
+
 
   socket.on("chat_message", (msg) =>
     setMessages((prev) => [...prev, msg])
@@ -47,9 +48,12 @@ useEffect(() => {
     setMessages((prev) => [...prev, { username: "System", text: msg }])
   );
 
-  socket.on("update_players", (list) => setPlayers(list));
+  socket.on("update_players", (list) => 
+ setPlayers(list)
+  );
 
   return () => {
+    // socket.off("connect");
     socket.off("chat_message");
     socket.off("system_message");
     socket.off("update_players");
@@ -77,38 +81,26 @@ useEffect(() => {
       return;
     }
 
-    // try{
-    //   const response = await fetch(`http://localhost:3003/start`,  {
-    //       method: "POST",
-    //       headers: { "Content-Type": "application/json" },
-    //       body: JSON.stringify({ roomId, username }),
-    //     });
+    try{
 
-    //     const data = await response.json();
-    //   console.log("Backend response:", data); // 👈 debug here
-      
-    //   if(response.ok && data.success){
+      const res = await fetch("http://localhost:3003/status");
 
-    //      // Save username globally before navigation
-    //     localStorage.setItem("username", username);
-    //     setUserName(username);
+      if(!res.ok){
+        throw new Error(`Game service not responding (status ${res.status})`);
+      }
 
-    //     //join the gameroom
-    //     socket.emit("player_ready_join", {roomId, username});
-    //     navigate(`/Gameroom/${roomId}`);
-    //   }
+      const data = await res.json();
+    if (data.status === "ok") {
+      alert("✅ Game Service is active! Moving to game room...");
+      navigate(`/Gameroom/${roomId}`);
+    } else {
+      alert("⚠️ Game Service is responding but not ready yet.");
+    }
 
-    //   else {
-    //   console.error("Failed to start game:", data);
-    //   alert("⚠️ Failed to start the game. Please try again.");
-    //   }
-
-    // } 
-    // catch (error) {
-    //     console.error("Error starting game:", error);
-    //     alert("⚠️ Error connecting to game server.");
-    // }  
-
+    }catch(err){  
+      console.error("❌ Game service unavailable:", err);
+      alert("❌ GameRules Service (port 3003) is not active. Please start it first.");
+    }
 
   navigate(`/Gameroom/${roomId}`);
 
@@ -118,17 +110,38 @@ useEffect(() => {
   const leaveRoom = async() => {
       if (username && roomId) {
       socket.emit("leave_room", { roomId, username });
-      navigate("/");
+      navigate("/Home");
       socket.disconnect();
     }
   }
 
 
-const handleReady = () => {
+const handleReady = async() => {
+
   if (!roomId || !username) return;
-  const newReady = !isReady;
-  setIsReady(newReady);
-  socket.emit("player_ready", { roomId, username, ready: newReady });
+
+ try{
+      const res = await fetch("http://localhost:3003/status");
+
+      if(!res.ok){
+        throw new Error(`Game service not responding (status ${res.status})`);
+      }
+
+      const data = await res.json();
+    if (data.status === "ok") {
+      alert("✅ Game Service is active! Moving to game room...");
+      const newReady = !isReady;
+    setIsReady(newReady);
+    socket.emit("player_ready", { roomId, username, ready: newReady });
+    } else {
+      alert("⚠️ Game Service is responding but not ready yet.");
+    }
+
+    }catch(err){  
+      console.error("❌ Game service unavailable:", err);
+      alert("❌ GameRules Service (port 3003) is not active. Please start it first.");
+    }
+
 };
 
     return(
@@ -138,11 +151,9 @@ const handleReady = () => {
         <p>Connected Room ID: <strong>{roomId}</strong></p>
         <p>username is {username}</p>
         </div>
-
-      
                  
            <h3>Room: {roomId}</h3>
-          <p>Players: {players.join(", ")}</p>
+          <p>Players: {Array.isArray(players) ? players.join(", ") : "NO Players yet"}</p>
 
           <div
             style={{
@@ -167,7 +178,7 @@ const handleReady = () => {
           />
           <button onClick={sendMSG}>Send</button>
 
-        <button onClick={handleReady}></button>
+    
             <input type="button" value="ready?"  onClick={handleReady}/>
           {isReady ? (<button onClick={Gameroom}>GameRoom</button>
           ) : ("🕒 Not Ready")}

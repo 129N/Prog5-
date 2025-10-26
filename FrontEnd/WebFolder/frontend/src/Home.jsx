@@ -5,12 +5,14 @@ import{ io }from "socket.io-client";
 import { useNavigate } from 'react-router-dom';
 
 
+
 // temporary the localhost is used/
 const socket = io("http://localhost:3002", {transports: ["websocket"]});
 
 function UserService() {
 
 const navigate = useNavigate();
+
 
   const [username, setUserName] = useState ("");
   const [roomId, setRoomId] = useState(""); //from index.js of user-service 
@@ -24,7 +26,7 @@ const navigate = useNavigate();
 // boolean
   const [created, setCreated] = useState(false); 
   const [connected, setConnected] = useState(false);
-
+  const [joning, setJoining] = useState(false);
   // to communicate with io in on the FE side, useEffect() is used.
 
   useEffect( () => {
@@ -53,6 +55,24 @@ const navigate = useNavigate();
 
   }, []);
 
+
+  useEffect(()=>{
+    socket.on("join_success",({roomId})=>{
+      console.log("✅ Successfully joined room:", roomId);
+      setJoining(false);
+    navigate(`/room/${roomId}`);
+    });
+
+    socket.on("error", (err)=>{
+      alert(err.message || "Server error");
+      setJoining(false);
+    });
+
+     return () => {
+    socket.off("join_success");
+    socket.off("error");
+  };
+  }, [navigate]);
 
   const createRoom = async() => {
     if(!roomName || !username){
@@ -97,18 +117,17 @@ const navigate = useNavigate();
   };
 
   const handleLogin = async()=> {
-     if (username && roomId) {
-      socket.emit("join_room", { roomId, username });
-      navigate(`/room/${roomId}`);
-      // setConnected(true);
+
+    //checks the blunk
+    if(!username || !roomId){
+          alert("Please fill the blunk!");
     }
 
-    else if(!username || !roomId){
-      alert("Please fill the blunk!");
-    }
-
+    // open the useEffect and the typed id will sent to the backend.
     else{
-      alert("FE error");
+      setJoining(true);
+      socket.emit("join_room", { roomId, username });
+      setTimeout(() => setJoining(false), 3000);
     }
  
   };
@@ -148,7 +167,7 @@ const navigate = useNavigate();
           />
           <input
             placeholder="Enter new room name"
-            value={roomName}
+            value={roomName || ""}
             onChange={(e) => setRoomName(e.target.value)}
           />
           <button onClick={createRoom}>Create Room</button>
