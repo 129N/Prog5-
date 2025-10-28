@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-
 import './App.css'
 import{ io }from "socket.io-client";
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +13,7 @@ function UserService() {
 const navigate = useNavigate();
 
 
-  const [username, setUserName] = useState ("");
+
   const [roomId, setRoomId] = useState(""); //from index.js of user-service 
 
   const [messages, setMessages] = useState([]);
@@ -28,11 +27,31 @@ const navigate = useNavigate();
   const [connected, setConnected] = useState(false);
   const [joning, setJoining] = useState(false);
   // to communicate with io in on the FE side, useEffect() is used.
+  const [username, setUserName] = useState ("");
+  const [userId, setUserId] = useState("");
+  const [token, setToken] = useState("");
+  useEffect(() => {
+
+    const username = localStorage.getItem("username");
+    const LoadId =localStorage.getItem("userId");
+    const LoadToken =localStorage.getItem("token");
+
+      if (username && LoadId && LoadToken) {
+      setUserName(username);
+      setUserId(LoadId);
+      setToken(LoadToken);
+    } else {
+      // if missing, redirect back to login
+      alert("⚠️ Please log in first!");
+      navigate("/");
+    }
+  }, [navigate]);
+
 
   useEffect( () => {
     socket.on("connect", () => console.log("✅ Connected to Room Service"));
     socket.on("system_message", (msg) =>
-          setMessages((prev) => [...prev, { username: "System", text: msg }])
+    setMessages((prev) => [...prev, { username: "System", text: msg }])
     );
     // what is the meaning of prev? role?
     socket.on("chat_message", (msg)=> {
@@ -81,7 +100,6 @@ const navigate = useNavigate();
     }
 
     try{
-
         const res = await fetch("http://localhost:3002/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -96,13 +114,13 @@ const navigate = useNavigate();
         alert(`Room ${data.roomName} created successfully!`);
 
          // Save username globally before navigation
-        localStorage.setItem("username", username);
-        setUserName(username);
+
+        // setUserName(username);
         setRoomId(data.roomId); // optional: auto-fill roomId field
         setRoomName(data.roomName);
-        // setUserName(data.username);
-
         setRoom(room);
+
+        //toggle function
         setCreated(true);
 
         socket.emit("join_room", { roomId: data.roomId, username });
@@ -117,16 +135,16 @@ const navigate = useNavigate();
   };
 
   const handleLogin = async()=> {
-
     //checks the blunk
-    if(!username || !roomId){
-          alert("Please fill the blunk!");
+    if(!roomId){
+      alert("Please fill the blunk!");
+      return;
     }
 
     // open the useEffect and the typed id will sent to the backend.
     else{
       setJoining(true);
-      socket.emit("join_room", { roomId, username });
+      socket.emit("join_room", { roomId, username });  // username from localStorage
       setTimeout(() => setJoining(false), 3000);
     }
  
@@ -148,6 +166,12 @@ const navigate = useNavigate();
     navigate(`/room/${roomId}`);
   };
 
+const handleLogout = () => {
+  localStorage.clear();
+  alert("✅ Logged out and localStorage cleared!");
+  navigate("/");
+};
+
   return (
 
       <div style={{ padding: "2rem", fontFamily: "Arial" }}>
@@ -160,6 +184,7 @@ const navigate = useNavigate();
 {!connected ? (
 
         <div>
+                    <button onClick={handleLogout}>Logout</button>
           <input
             placeholder="Enter your name"
             value={username}

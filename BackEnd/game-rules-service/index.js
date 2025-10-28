@@ -66,9 +66,6 @@ io.on('connection', (socket)=> {
     } );
 
 
-
- 
-
 //send msg 
 socket.on('send_message', ({roomId, username, text}) =>{
     if (!gamerooms[roomId]) return;

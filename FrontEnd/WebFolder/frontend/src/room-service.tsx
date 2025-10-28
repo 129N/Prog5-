@@ -153,7 +153,7 @@ const handleReady = async() => {
         </div>
                  
            <h3>Room: {roomId}</h3>
-          <p>Players: {Array.isArray(players) ? players.join(", ") : "NO Players yet"}</p>
+          <p>Players: </p>
 
           <div
             style={{

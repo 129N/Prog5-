@@ -44,7 +44,7 @@ io.on('connection', (socket)=> {
     //join, chat, leave. 
 
     //username is shared with user-service? 
-    socket.on('join_room', ({roomId, username}) => {
+    socket.on('join_room', ({roomId, username, userId}) => {
 
       //1 : check validation
       if(!uuidValidate(roomId)){
@@ -58,6 +58,11 @@ io.on('connection', (socket)=> {
             return;
         }
 
+        //
+        if(!Array.isArray(room.players)){
+          room.players = [];
+        }
+
         //continue only if the room exist
         const duplicate = room.players.find(p => p.username === username);
         if(duplicate){
@@ -65,18 +70,17 @@ io.on('connection', (socket)=> {
           return;
         }
 
-        //prevent duplicates players
-        if(!Array.isArray(room.players)){
-          room.players = [];
-        }
+// ✅ Add player object with socket.id
+        const player = {username,userId, socketId: socket.id};
+        room.players.push(player);
 
-        const alreadyInRooom = room.players.includes(username);
-        if(!alreadyInRooom){
-            room.players.push(username);
-            console.log(`👥 ${username} joined room ${roomId}`);
-        }else{
-          
-        }
+//
+
+        // const alreadyInRooom = room.players.includes(username);
+        // if(!alreadyInRooom){
+        //     room.players.push(username);
+        //     console.log(`👥 ${username} joined room ${roomId}`);
+        // }
 
 
         
@@ -142,10 +146,10 @@ io.on('connection', (socket)=> {
         console.log("🎮 GameRules Service response:", data);
 
         io.to(roomId).emit("system_message", "🎮 Game starting!");
-        io.to(roomId).emit("game_start", data);
+        io.to(roomId).emit("game_start", room.players);
       } catch (err) {
         console.error("❌ Error starting game:", err);
-        alert("the port has not created yet !!");
+        console.error("the port has not created yet !!");
         io.to(roomId).emit("system messgae", "Failed to start game");
       }
   }
@@ -176,25 +180,27 @@ io.on('connection', (socket)=> {
   }
     });
 
-
-
     //disconnect
-    socket.on('disconnect', ()=> {
-        console.log(`❌ Client disconnected: ${socket.id}`);  
+    socket.on("disconnect", () => {
+      for (const roomId in rooms) {
+        const room = rooms[roomId];
+        if (!room.players) continue;
+        const idx = room.players.findIndex(p =>p.socketId === socket.id);
+        if(idx !== -1){
+          const [left] = room.players.splice(idx, 1);
+          console.log(`❌ ${left.username} disconnected from ${roomId}`);
+          io.to(roomId).emit("system_message", `${left.username} left the room.`);
+          io.to(roomId).emit("update_players", room.players);
+        }
+      }
     });
+
 });
 
 
-// socket.on("disconnect", () => {
-//   for (const [id, room] of Object.entries(rooms)) {
-//     if (room.players.includes(socket.username)) {
-//       room.players = room.players.filter(p => p !== socket.username);
-//       io.to(id).emit("update_players", room.players);
-//       console.log(`❌ ${socket.username} disconnected from room ${id}`);
-//     }
-//   }
-// });
-
+    // socket.on('disconnect', ()=> {
+    //     console.log(`❌ Client disconnected: ${socket.id}`);  
+    // });
 
 app.get('/', (req, res) => {
     res.send(`User room is running on ${port}`);

@@ -21,8 +21,10 @@ const navigate = useNavigate();
   // to communicate with io in on the FE side, useEffect() is used.
 
   useEffect( () => {
-
-  }, []);
+    // 🧹 Clear all old user/session data
+    localStorage.clear();
+    console.log("🧹 Cleared localStorage for a clean start");
+  }, []); // ✅ runs only once when the app first loads
 
 
   const handleLogin = async()=> {
@@ -68,7 +70,7 @@ const navigate = useNavigate();
   return (
       
       <div style={{ padding: "2rem", fontFamily: "Arial" }}>
-      <h2>👋 Login to Funny Game</h2>
+      <h2>👋 Login to Game</h2>
       <input
         placeholder="Enter username"
         value={username}
