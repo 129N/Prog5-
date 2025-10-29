@@ -4,15 +4,12 @@ import{ io }from "socket.io-client";
 import { useNavigate } from 'react-router-dom';
 
 
-
 // temporary the localhost is used/
 const socket = io("http://localhost:3002", {transports: ["websocket"]});
 
 function UserService() {
 
 const navigate = useNavigate();
-
-
 
   const [roomId, setRoomId] = useState(""); //from index.js of user-service 
 
@@ -22,6 +19,9 @@ const navigate = useNavigate();
   const [roomName, setRoomName] = useState("");
   const [room, setRoom] = useState("");
 
+  const [host, setHost] = useState(null);
+  
+ 
 // boolean
   const [created, setCreated] = useState(false); 
   const [connected, setConnected] = useState(false);
@@ -98,12 +98,14 @@ const navigate = useNavigate();
       alert("Please fill the blunk!");
       return;
     }
-
+    
     try{
         const res = await fetch("http://localhost:3002/create", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ roomName, username }),
+          headers: { "Content-Type": "application/json",
+            "Authorization" : `Bearer ${token}`,
+           },
+          body: JSON.stringify({ roomName }),
         });
 
         const data = await res.json();
@@ -119,11 +121,13 @@ const navigate = useNavigate();
         setRoomId(data.roomId); // optional: auto-fill roomId field
         setRoomName(data.roomName);
         setRoom(room);
+        setHost(data.host);
+        localStorage.setItem("host", JSON.stringify(data.host)); // optional, for later use
 
         //toggle function
         setCreated(true);
 
-        socket.emit("join_room", { roomId: data.roomId, username });
+        socket.emit("join_room", { roomId: data.roomId, token });
       }
 
     }
@@ -135,7 +139,9 @@ const navigate = useNavigate();
   };
 
   const handleLogin = async()=> {
-    //checks the blunk
+
+          const token = localStorage.getItem("token");
+    //checks the blank
     if(!roomId){
       alert("Please fill the blunk!");
       return;
@@ -144,7 +150,7 @@ const navigate = useNavigate();
     // open the useEffect and the typed id will sent to the backend.
     else{
       setJoining(true);
-      socket.emit("join_room", { roomId, username });  // username from localStorage
+      socket.emit("join_room", { roomId, token });  // username from localStorage
       setTimeout(() => setJoining(false), 3000);
     }
  

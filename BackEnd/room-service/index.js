@@ -1,13 +1,26 @@
-const express = require('express');
-const http = require('http');
-const {Server} = require('socket.io');
-const cors = require('cors');
-const { v4: uuidv4, validate } = require('uuid');
+// const express = require('express');
+// const {Server} = require('socket.io');
+// const http = require('http');
+//const cors = require('cors');
+// const { v4: uuidv4, validate } = require('uuid');
+import express from "express";
+import { Server } from "socket.io";
+import http from "http";
+import cors from "cors";
+import fetch from "node-fetch";
+import dotenv from "dotenv";
+import jwt from "jsonwebtoken";
 
+import { v4 as uuidv4, validate } from "uuid";
+import { validate as uuidValidate } from "uuid";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+//to use jwt, the secret key is needed.
+dotenv.config();
+const SECRET_KEY = process.env.SECRET_KEY;
 
 //set up the port in this case 3002
 const port = process.env.port || 3002;
@@ -18,7 +31,7 @@ const io = new Server(server, {
     cors:{origin: "*"}
 });
 
-const {validate: uuidValidate} = require("uuid");
+// const {validate: uuidValidate} = require("uuid");
 
 
 const rooms = [];
@@ -26,13 +39,39 @@ const rooms = [];
 //Create a team 
 app.post('/create', (req, res)=> {
     const {roomName} = req.body;
+    const authHeader = req.headers.authorization;
+
     if (!roomName) return res.status(400).json({ error: 'roomName is required' });
 
-    const roomId = uuidv4();
-    rooms[roomId] = {id : roomId, name : roomName, players:[], messages: []};
+      // 🔒 Require token
+    if (!authHeader || !authHeader.startsWith("Bearer ") ) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
 
-    console.log(`🏠 Room created: ${roomName} (${roomId})`);
-    res.json({ success: true, roomId });
+    const token = authHeader.split(" ")[1];
+
+    try{
+      const decoded = jwt.verify(token, SECRET_KEY);
+      const {username, userId} = decoded;
+  
+    const roomId = uuidv4();
+    rooms[roomId] = {id : roomId, name : roomName, host:{username, userId}, 
+    players:[{username, userId}], messages: []};
+
+    console.log(`🏠 Room created by ${username} (${userId}) — ${roomName} (${roomId})`);
+
+    res.json({
+      success: true,
+      roomId,
+      roomName,
+      host: username,
+    });
+        console.log(`🏠 Room created: ${roomName} (${roomId})`);
+    }
+    catch  (err) {
+    console.error("JWT verification failed:", err);
+    return res.status(403).json({ success: false, message: 'Invalid or expired token' });
+    }
 });
 
 
@@ -44,9 +83,13 @@ io.on('connection', (socket)=> {
     //join, chat, leave. 
 
     //username is shared with user-service? 
-    socket.on('join_room', ({roomId, username, userId}) => {
+    socket.on('join_room', ({roomId, token}) => {
+    try{    
+      
+      const decoded = jwt.verify(token, SECRET_KEY);
+      const { username, userId } = decoded;
 
-      //1 : check validation
+  //1 : check validation
       if(!uuidValidate(roomId)){
         socket.emit('error', { message: 'BE : Invalid room ID format' });
         return;
@@ -74,26 +117,27 @@ io.on('connection', (socket)=> {
         const player = {username,userId, socketId: socket.id};
         room.players.push(player);
 
-//
-
         // const alreadyInRooom = room.players.includes(username);
         // if(!alreadyInRooom){
         //     room.players.push(username);
         //     console.log(`👥 ${username} joined room ${roomId}`);
         // }
 
-
         
   // ✅ 4. Valid join — proceed
         socket.join(roomId);
-          socket.username = username;
-        // room.players.push(username);
+        socket.username = username;
+        socket.userId = userId;
 
         console.log(`👥 ${username} joined room ${roomId}`);
 
         socket.emit('join_success', { roomId, username });
         io.to(roomId).emit('system_message', `${username} joined the room.`);
         io.to(roomId).emit('update_players', rooms[roomId].players);
+      } catch(err){
+          console.error("JWT verification failed:", err);
+          socket.emit('error', { message: 'Invalid or expired token' });
+        }
     });
 
     //chat system 
@@ -209,6 +253,23 @@ app.get('/', (req, res) => {
 app.get('/rooms', (req, res)=> {
 
     res.json(rooms);
+});
+
+app.get("/room/:roomId", (req, res) => {
+  const { roomId } = req.params;
+  const room = rooms[roomId];
+
+  if (!room) {
+    return res.status(404).json({ success: false, message: "Room not found" });
+  }
+
+  return res.json({
+    success: true,
+    roomId,
+    roomName: room.roomName,
+    host: room.host,
+    players: room.players,
+  });
 });
 
 

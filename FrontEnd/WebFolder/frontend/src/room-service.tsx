@@ -1,6 +1,6 @@
 
 import { cache, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { data, useNavigate, useParams } from "react-router-dom";
 
 import { socket } from "./socket";
 interface Message {
@@ -8,33 +8,46 @@ interface Message {
   text?: string;
   message?: string;
 }
+interface Host {
+  username: string;
+  userId: string;
+}
+interface Player {
+  username: string;
+  userId: string;
+}
+
+interface RoomData {
+  roomId: string;
+  roomName: string;
+  host: Host;
+  players: Player[];
+}
 
 export default function LobbyRoom(){
 
   const { roomId } = useParams();  //from index.js of user-service 
-  const [username, setUserName] = useState (localStorage.getItem("username") || "");
+  const [username, setUserName] = useState(localStorage.getItem("username") || "");
 
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [players, setPlayers] = useState<String[]>([]);
   const [messageInput, setMessageInput] = useState("");
 
-    const [roomBlunkId, setRoomId] = useState(""); //from index.js of user-service 
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
+  const [isReady, setIsReady] = useState(false);
 
-    const [isReady, setIsReady] = useState(false);
+  const [host, setHost] = useState(localStorage.getItem("host") || "");
+  const [roomData, setRoomData] = useState<RoomData | null>(null);
 
-    // const [SC, setSocket] = useState<Socket | null>(null);
-
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
 
 useEffect(() => {
   socket.on("connect", () => console.log("✅ Connected to Room Service"));
-
     if (!username || !roomId) {
     return
   }
-  
     if(roomId && username){
       socket.emit("join_room", { roomId, username });
   };
@@ -144,17 +157,43 @@ const handleReady = async() => {
 
 };
 
+
+useEffect(() =>{
+  const loadRoom = async()=>{
+ try {
+        const res = await fetch(`http://localhost:3002/room/${roomId}`);
+        const data = await res.json();
+        if (data.success) {
+          setRoomData(data);
+        } else {
+          console.error("Failed to load room:", data.message);
+        }
+      } catch (err) {
+        console.error("Error loading room:", err);
+      }
+  };
+
+
+if (roomId) loadRoom();
+}, [roomId]);
+
     return(
         <>
-        <div style={{ padding: "2rem", fontFamily: "Arial" }}>
+      <div style={{ padding: "2rem", fontFamily: "Arial" }}>
         <h1>🏠 Lobby Room</h1>
         <p>Connected Room ID: <strong>{roomId}</strong></p>
         <p>username is {username}</p>
-        </div>
-                 
-           <h3>Room: {roomId}</h3>
-          <p>Players: </p>
+        {!roomData ? (
 
+            <p>Loading room data...</p>
+
+        ) : (
+          <>
+           <h3>Room: {roomData.roomName}</h3>
+            <p> Host : {roomData?.host?.username || "Loading..."}</p>
+            <h3>Room: {roomId}</h3>
+            <p>Players: {players} </p>
+     
           <div
             style={{
               border: "1px solid gray",
@@ -177,14 +216,18 @@ const handleReady = async() => {
             onChange={(e) => setMessageInput(e.target.value)}
           />
           <button onClick={sendMSG}>Send</button>
+          <input type="button" value="ready?"  onClick={handleReady}/>
 
-    
-            <input type="button" value="ready?"  onClick={handleReady}/>
+             
           {isReady ? (<button onClick={Gameroom}>GameRoom</button>
           ) : ("🕒 Not Ready")}
 
 
           <button onClick={leaveRoom}>Leave</button>
+     </>
+
+        )};
+        </div>
         </>
     );
 };
