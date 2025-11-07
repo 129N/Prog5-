@@ -45,12 +45,12 @@ const navigate = useNavigate();
       const data = await res.json();
         if (data.success) {
         const { user } = data;
-        console.log("✅ Logged in:", user);
+        console.log("✅ Logged in:", data.user);
 
         // Save locally
-        localStorage.setItem("userId", user.userId);
-        localStorage.setItem("username", user.username);
-        localStorage.setItem("token", user.token);
+        localStorage.setItem("userId", data.user.userId);
+        localStorage.setItem("username", data.user.username);
+        localStorage.setItem("token", data.user.token);
 
         onLogin(user); // callback to App
         navigate("/Home");

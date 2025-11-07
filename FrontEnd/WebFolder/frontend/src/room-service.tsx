@@ -12,9 +12,11 @@ interface Host {
   username: string;
   userId: string;
 }
+
 interface Player {
   username: string;
   userId: string;
+  socketId?: string;
 }
 
 interface RoomData {
@@ -31,7 +33,7 @@ export default function LobbyRoom(){
 
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [players, setPlayers] = useState<String[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [messageInput, setMessageInput] = useState("");
 
   const [token, setToken] = useState(localStorage.getItem("token") || "");
@@ -49,7 +51,7 @@ useEffect(() => {
     return
   }
     if(roomId && username){
-      socket.emit("join_room", { roomId, username });
+      socket.emit("join_room", { roomId, token }); //should be parsed token, not the username.
   };
 
 
@@ -75,6 +77,8 @@ useEffect(() => {
 
 
   const sendMSG = async() => {
+    const trimmed = messageInput.trim();
+      if (!trimmed) return;
      if (messageInput.trim() && socket) {
           console.log("📤 Sending message:", messageInput); // debug log
       socket.emit("chat_message", {
@@ -192,7 +196,14 @@ if (roomId) loadRoom();
            <h3>Room: {roomData.roomName}</h3>
             <p> Host : {roomData?.host?.username || "Loading..."}</p>
             <h3>Room: {roomId}</h3>
-            <p>Players: {players} </p>
+            <div>
+              <h3>Players:</h3>
+            <p>
+              Players: {players.map((p) => p.username).join(", ")}
+            </p>
+
+            </div>
+
      
           <div
             style={{

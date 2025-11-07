@@ -10,8 +10,7 @@ import cors from "cors";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
-
-import { v4 as uuidv4, validate } from "uuid";
+import { v4 as uuidv4 } from "uuid";
 import { validate as uuidValidate } from "uuid";
 
 const app = express();
@@ -34,7 +33,7 @@ const io = new Server(server, {
 // const {validate: uuidValidate} = require("uuid");
 
 
-const rooms = [];
+const rooms = {};
 
 //Create a team 
 app.post('/create', (req, res)=> {
@@ -79,7 +78,6 @@ app.post('/create', (req, res)=> {
 //websocket real-time connection
 io.on('connection', (socket)=> {
     console.log(`⚡room Client connected: ${socket.id}`);
-
     //join, chat, leave. 
 
     //username is shared with user-service? 
@@ -87,8 +85,14 @@ io.on('connection', (socket)=> {
     try{    
       
       const decoded = jwt.verify(token, SECRET_KEY);
-      const { username, userId } = decoded;
+      const username = (decoded.username || "").trim();
+      const userId = decoded.userId;
+      console.log("✅ Token decoded:", { username, userId, roomId });
 
+      if (!username || !userId) {
+        socket.emit("error", { message: "Invalid token payload" });
+        return;
+      }
   //1 : check validation
       if(!uuidValidate(roomId)){
         socket.emit('error', { message: 'BE : Invalid room ID format' });
@@ -101,39 +105,46 @@ io.on('connection', (socket)=> {
             return;
         }
 
-        //
-        if(!Array.isArray(room.players)){
-          room.players = [];
-        }
+        if(!Array.isArray(room.players)){ room.players = []; }
 
-        //continue only if the room exist
-        const duplicate = room.players.find(p => p.username === username);
-        if(duplicate){
-          socket.emit("error", { message: 'User name already taken in this room' });
-          return;
-        }
+ // ✅ If the same userId already exists, allow rejoin
+  const existingPlayer = room.players.find(p => p.userId === userId);
+
+  if(existingPlayer){
+    existingPlayer.socketId = socket.id; // update socket binding
+    socket.join(roomId);
+    socket.username = username;
+    socket.userId = userId;
+
+    console.log(`♻️ ${username} reconnected to room ${userId}`);
+    io.to(roomId).emit("system_message", `${username} reconnected.`);
+    io.to(roomId).emit("update_players", room.players);
+    socket.emit("join_success", { roomId, username: username });
+    return;
+  }
+
+    //continue only if the room exist
+    const duplicateName = room.players.some( p => p.username === username && p.userId !== userId);
+    if(duplicateName){
+      socket.emit("error", { message: 'Username already taken in this room' });
+      return;
+    }
 
 // ✅ Add player object with socket.id
-        const player = {username,userId, socketId: socket.id};
+        const player = {userId ,userId, socketId: socket.id};
         room.players.push(player);
-
-        // const alreadyInRooom = room.players.includes(username);
-        // if(!alreadyInRooom){
-        //     room.players.push(username);
-        //     console.log(`👥 ${username} joined room ${roomId}`);
-        // }
-
         
   // ✅ 4. Valid join — proceed
         socket.join(roomId);
         socket.username = username;
         socket.userId = userId;
 
-        console.log(`👥 ${username} joined room ${roomId}`);
-
+        console.log(`👥 ${username} joined room ${userId}`);
         socket.emit('join_success', { roomId, username });
+
+
         io.to(roomId).emit('system_message', `${username} joined the room.`);
-        io.to(roomId).emit('update_players', rooms[roomId].players);
+        io.to(roomId).emit('update_players', room.players); // const room = rooms[roomId];
       } catch(err){
           console.error("JWT verification failed:", err);
           socket.emit('error', { message: 'Invalid or expired token' });
@@ -141,17 +152,23 @@ io.on('connection', (socket)=> {
     });
 
     //chat system 
-    socket.on('chat_message', ({roomId, username, message}) => {
-        
-        if(!rooms[roomId]){
+    socket.on('chat_message', ({roomId, message}) => 
+    {
+      const room = rooms[roomId];  
+        if(!room){
             socket.emit('error', { message: 'message error' });
             return;
+        }   
+        
+        if (!socket.username || !socket.userId) {
+        socket.emit("error", { message: "Not joined; cannot send messages" });
+        return;
         }
 
-        const msg = {username, message};
-        rooms[roomId].messages.push(msg);
+        const msg = {username: socket.username, userId: socket.userId, message};
+        room.messages.push(msg);
         io.to(roomId).emit('chat_message', msg);
-          console.log(`💬 ${username} in ${roomId}: ${message}`);
+        console.log(`💬 ${socket.username} in ${roomId}: ${message}`);
     });
 
        socket.on("player_ready", async ({roomId, username, ready}) => {
@@ -201,28 +218,28 @@ io.on('connection', (socket)=> {
     });
     
 
-    socket.on('leave_room', ({roomId, username})=>{
-        const room = rooms[roomId];
-        if(!room) return;
+socket.on('leave_room', ({ roomId }) => {
+  const room = rooms[roomId];
+  if (!room) return;
 
-        socket.leave(roomId);
+  socket.leave(roomId);
 
-        //Remove Player
-       room.players = rooms[roomId].players.filter(p =>p !== username ); 
-        if (room.readyPlayers) room.readyPlayers.delete(username);
+  // remove by socket.userId (set in join)
+  room.players = room.players.filter(p => p.userId !== socket.userId);
+  if (room.readyPlayers) room.readyPlayers.delete(socket.username); // or use userId if you switch
 
-        console.log(`👥 ${username} left room ${roomId}`);
+  console.log(`👥 ${socket.username} left room ${roomId}`);
+  io.to(roomId).emit('system_message', `${socket.username} left the room.`);
+  io.to(roomId).emit('update_players', room.players);
 
-        io.to(roomId).emit('system_message', `${username} left the room.`);
-        io.to(roomId).emit('update_players', rooms[roomId].players);
+  socket.emit("left_success", { roomId });
 
-        socket.emit("left_success", { roomId });
-         // ✅ Delete empty rooms
   if (room.players.length === 0) {
     delete rooms[roomId];
     console.log(`🗑️ Room ${roomId} deleted (no players left).`);
   }
-    });
+});
+
 
     //disconnect
     socket.on("disconnect", () => {
