@@ -20,7 +20,7 @@ app.use(express.json());
 //to use jwt, the secret key is needed.
 dotenv.config();
 const SECRET_KEY = process.env.SECRET_KEY;
-
+const REFRESH_KEY = process.env.REFRESH_KEY;
 //set up the port in this case 3002
 const port = process.env.port || 3002;
 

@@ -15,6 +15,7 @@ import { v4 as uuidv4, validate } from "uuid";
 import dotenv from "dotenv";
 dotenv.config();
 const SECRET_KEY = process.env.SECRET_KEY;
+const REFRESH_KEY = process.env.REFRESH_KEY || "refresh_secret";
 
 const app = express();
 app.use(cors());
@@ -38,17 +39,18 @@ io.on('connection', (socket)=> {
 });
 
 
-const users = [];
+const users ={};
 
-function generateToken(){
-    return Math.random().toString(36).substring(2, 15);
-}
+// function generateToken(){
+//     return Math.random().toString(36).substring(2, 15);
+// }
 
 //Register or login 
 app.post('/login', (req, res) => {
 //Generate userId[]
   const { username } = req.body;
 
+  //username check
   if (!username || username.trim() === "") {
     return res.status(400).json({ success: false, message: "Username is required" });
   }
@@ -59,15 +61,37 @@ app.post('/login', (req, res) => {
     }
     const userId = uuidv4();
 
-    const token = jwt.sign({username, userId}, SECRET_KEY, {expiresIn : "1h" });
-
+    //create two tokens to prevent using an expiration token.
+    const token = jwt.sign({username, userId}, SECRET_KEY, {expiresIn : "15m" });
+    const refreshToken = jwt.sign({username, userId}, REFRESH_KEY, {expiresIn: "7d"});
       // Otherwise create new user
-  const user = { username, userId, token };
-    users[username] = user;
+  const user = { username, userId, token, refreshToken };
+    users[userId] = user;
   console.log(`🧍‍♂️ New user logged in: ${user.username} (${user.userId})`);
   console.log(`Token : ${user.token}`);
     return res.json({success : true, user });
 });
+
+
+//
+app.post("/refresh", (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) return res.status(401).json({ success: false, message: "No refresh token" });
+
+  try {
+    const decoded = jwt.verify(refreshToken, REFRESH_KEY);
+    const { username, userId } = decoded;
+    const newToken = jwt.sign({ username, userId }, SECRET_KEY, { expiresIn: "15m" });
+
+    users[username].token = newToken; // update stored access token
+
+    res.json({ success: true, token: newToken });
+  } catch (err) {
+    console.error("Refresh failed:", err);
+    res.status(403).json({ success: false, message: "Invalid refresh token" });
+  }
+});
+
 
 //rendering zone 
 

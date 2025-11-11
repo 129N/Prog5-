@@ -1,7 +1,7 @@
 
 import { cache, useEffect, useState } from "react";
 import { data, useNavigate, useParams } from "react-router-dom";
-
+import { getValidToken } from "./auth";
 import { socket } from "./socket";
 interface Message {
   username: string;
@@ -46,13 +46,26 @@ export default function LobbyRoom(){
 
 
 useEffect(() => {
+// 
+
+const init = async() => {
+  const validToken = await getValidToken();
+  if(!validToken || !roomId || !username) return;
+
+     console.log("✅ Using valid token:", validToken);
+    setToken(validToken);
+    socket.emit("join_room", { roomId, token: validToken });
+};
+
+init();
+
   socket.on("connect", () => console.log("✅ Connected to Room Service"));
     if (!username || !roomId) {
     return
   }
-    if(roomId && username){
-      socket.emit("join_room", { roomId, token }); //should be parsed token, not the username.
-  };
+  //   if(roomId && username){
+  //     socket.emit("join_room", { roomId, token }); //should be parsed token, not the username.
+  // };
 
 
   socket.on("chat_message", (msg) =>
@@ -67,13 +80,24 @@ useEffect(() => {
  setPlayers(list)
   );
 
+  socket.on("reconnect", () => {
+  const roomId = localStorage.getItem("roomId");
+  const token = localStorage.getItem("token");
+  if (roomId && token) {
+    console.log("🔁 Rejoining room after reconnect...");
+    socket.emit("join_room", { roomId, token });
+  }
+});
+
+
   return () => {
     // socket.off("connect");
     socket.off("chat_message");
     socket.off("system_message");
     socket.off("update_players");
+    socket.off("reconnect");
   };
-}, [roomId, username]);
+}, [roomId, username, token]);
 
 
   const sendMSG = async() => {
@@ -198,9 +222,10 @@ if (roomId) loadRoom();
             <h3>Room: {roomId}</h3>
             <div>
               <h3>Players:</h3>
-            <p>
-              Players: {players.map((p) => p.username).join(", ")}
-            </p>
+<p>
+  Players: {players.length > 0 ? players.map(p => p.username).join(", ") : "No players yet"}
+</p>
+
 
             </div>
 
@@ -241,4 +266,4 @@ if (roomId) loadRoom();
         </div>
         </>
     );
-};
+}

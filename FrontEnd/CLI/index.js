@@ -1,2 +1,2 @@
 
-console.log("HIHI");
+console.log("CLI HELLO");

@@ -19,10 +19,31 @@ const io = new Server(server, {
 
 //game = {roomId: { players: [names], scores: {name: points}, messages: [] }};
 
-let gamerooms = {};
+const gamerooms = {};
+
+// make the words players need to use in the game.
+const CATS = ["WHEN", "WHERE", "WHO", "WHAT"];
+
+const chooseRandom = (players, round) => {
+  // Rotate players per round; if players < 4, wrap
+  // Return { WHEN: userId, WHERE: userId, WHO: userId, WHAT: userId }
+  const ids = players.map(p => p.userId);
+
+  const pick = i => ids[(i + round) % ids.length];
+    return {
+    WHEN: pick(0),
+    WHERE: pick(1),
+    WHO:  pick(2),
+    WHAT: pick(3),
+  };
+};
+
+const allSubmitted = (sub) => CATS.every(c => typeof sub[c] === "string" && sub[c].trim().length > 0);
+const makeSentence = (s) =>
+  `${s.WHEN}, ${s.WHERE}, ${s.WHO}, ${s.WHAT}.`;
 
 app.post('/start',(req, res)=> {
-    const {roomId, players} = req.body;
+    const {roomId, players, maxRounds = 3} = req.body;
     console.log();
     
   if (!roomId || !players || !Array.isArray(players)) {
@@ -36,10 +57,23 @@ app.post('/start',(req, res)=> {
 
   //the necesarry components to be used in this index.js
   gamerooms[roomId] ={
-    players, 
-    scores: players.reduce((acc, p) => ({ ...acc, [p]: 0 }), {}), //
+    roomId,
+    players: players.map(p=> ({userId: p.userId, username: p.username})),
+    round: 1, 
+    //scores: players.reduce((acc, p) => ({ ...acc, [p]: 0 }), {}), //
+    scores: Object.fromEntries(players.map(p => [p.userId, 0])),
+    assignments : chooseRandom(players, 0), 
+    submissions: {},
+    votes: {},
+    history: [],
     messages: [],
   };
+
+  io.to(roomId).emit("round_start", {
+    round: gamerooms[roomId].round,
+    maxRounds,
+    categories: CATS,
+  });
 
   console.log(`${roomId} in ${players.join(', ')}`);
     res.json({ success: true, message: `Game room ${roomId} created`, players });

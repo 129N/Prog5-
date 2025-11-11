@@ -78,7 +78,7 @@ useEffect(() => {
 
                 <div>
                   {players.map((p,i) => {
-                    <p key={i}> 👤 {p.username || p} ({p.userId || "no ID"}) </p>
+                    return <p key={i}> 👤 {p.username || p} ({p.userId || "no ID"}) </p>
                   })}
 
                 </div>
