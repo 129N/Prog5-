@@ -1,0 +1,10 @@
+{
+  "PL58K": {
+    "host": "test1",
+    "players": [
+      "test1",
+      "test2"
+    ],
+    "maxRounds": 3
+  }
+}
