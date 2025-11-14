@@ -1,7 +1,7 @@
 import fs from "fs";
 import { bar } from "./index.js";
 import path from "path";
-import { runGame } from "./play.js";
+import { runGame,waitFor } from "./play.js";
 const ROOM_FILE = path.resolve("./rooms.json");
 
 function ensureRoomFile() {
@@ -10,7 +10,7 @@ function ensureRoomFile() {
   }
 }
 
-function loadRooms(){
+export function loadRooms(){
     ensureRoomFile();
 
     try {
@@ -20,12 +20,12 @@ function loadRooms(){
     }
 }
 
-function saveRooms(rooms){
+export function saveRooms(rooms){
     fs.writeFileSync(ROOM_FILE, JSON.stringify(rooms, null, 2));
 }
 
 
-function getRoom(code){
+export function getRoom(code){
     const rooms = loadRooms();
     return rooms[code];
 }
@@ -50,7 +50,7 @@ export function setRoom(code, roomData) {
 //   }
 // }
 
-function updateRoom(code, roomData){
+export function updateRoom(code, roomData){
     const rooms = loadRooms();
     rooms[code] = roomData;
     saveRooms(rooms);
@@ -143,7 +143,9 @@ while(true){
         if (room.players.length < 2) { console.log("⚠️ Need at least 2 players."); continue; }
 
         //if there are 2 ppl, it goes to the play.js
-    await runGame(room, rl);
+        room.gameState = "started";
+       updateRoom(code, room);
+      await runGame(room, rl, userName, code);
 
          // after game end, close room:
         deleteRoom(code);
@@ -183,6 +185,19 @@ while(true){
     // player option
     else{
         console.log("1) Leave room");
+        console.log(bar);
+        console.log("⏳ Waiting for host to start the game...");
+          // Poll for game start
+
+          await waitFor(() =>{
+            const updated = getRoom(code);
+            return updated?.gameState === "started";
+          });
+
+          const updatedRoom = getRoom(code);
+          console.log("🎮 Game is starting!");
+          await runGame(updatedRoom, rl, userName, code);
+
         const c = await ask(rl, "Choose (1): ");
         if (c === "1") {
             // remove player

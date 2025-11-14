@@ -1,8 +1,24 @@
 // backEnd/game-cli/play.js
+import {saveRooms, getRoom, updateRoom, loadRooms } from "./room.js";
 
 const CATS = ["WHEN", "WHERE", "WHO", "WHAT"];
 
+// input 
 function ask(rl, q) { return new Promise(res => rl.question(q, ans => res(ans.trim()))); }
+
+//polling function to syncronise 2 tabs
+export async function waitFor(conditionFn, checkInterval = 1000){
+  return new Promise(resolve =>{
+    const t = setInterval(async () =>{
+      const ok = await conditionFn();
+      if(ok){
+        clearInterval(t);
+        resolve();
+      }
+    }, checkInterval);
+  });
+}
+
 
 function rotateAssignments(players, roundIndex) {
   // Returns map { WHEN: name, WHERE: name, WHO: name, WHAT: name }
@@ -20,7 +36,7 @@ function makeSentence(sub) {
   return `${sub.WHEN}, ${sub.WHERE}, ${sub.WHO}, ${sub.WHAT}.`;
 }
 
-export async function runGame(room, rl) {
+export async function runGame(room, rl, userName, roomCode) {
   const players = [...room.players];
   const maxRounds = room.maxRounds ?? 3;
   const scores = Object.fromEntries(players.map(p => [p, 0]));
@@ -32,15 +48,36 @@ export async function runGame(room, rl) {
     const assignments = rotateAssignments(players, r - 1);
     const submissions = {};
 
+    room.submissions = {};
+    updateRoom(roomCode, room);
+
     console.log("🔐 Assignments (hidden from other players in real game, shown here for CLI clarity):");
     console.table(assignments);
 
     // Submissions
     for (const cat of CATS) {
       const author = assignments[cat];
-      const text = await ask(rl, `✏️  ${author}, enter your ${cat}: `);
-      if (!text) { console.log("⚠️ Empty, try again."); return r--; }
-      submissions[cat] = text;
+
+      if(author === userName){
+        const text = await ask(rl, `✏️  ${author}, enter your ${cat}: `);
+        if (!text) { console.log("⚠️ Empty, try again."); return r--; }
+        submissions[cat] = text;
+
+        // save to Json
+        room.submissions = room.submissions || {};
+        room.submissions[cat] = { author, text };
+        updateRoom(roomCode, room);
+      }else{
+        // need to wait until the other user finishes
+        console.log(`⌛ Waiting for ${author} to submit ${cat}...`);
+        await waitFor(() =>{
+          const updated = getRoom(roomCode);
+          return updated?.submissions?.[cat];
+        });
+
+        const updated = getRoom(roomCode);
+        submissions[cat] = updated.submissions[cat].text;
+      }
     }
 
     const sentence = makeSentence(submissions);
@@ -49,14 +86,22 @@ export async function runGame(room, rl) {
     // Voting
     console.log("\n🗳️ Voting phase (no self-vote):");
     const votes = {}; // voterName -> category
+    room.votes = room.votes || {};
+    updateRoom(roomCode, room);
+    
     for (const voter of players) {
-      let cat = (await ask(rl, `Vote (WHEN/WHERE/WHO/WHAT), ${voter}: `)).toUpperCase();
-      if (!CATS.includes(cat)) { console.log("❌ Invalid category. Try again."); voter--; continue; }
-      if (assignments[cat] === voter) {
-        console.log("❌ You cannot vote for your own part. Vote skipped.");
-        continue;
+
+      if (voter == userName){
+        let cat;
+        while(true){
+          let cat = (await ask(rl, `Vote (WHEN/WHERE/WHO/WHAT), ${voter}: `)).toUpperCase();
+          if (!CATS.includes(cat)) { console.log("❌ Invalid category. Try again."); voter--; continue; }
+          if (assignments[cat] === voter) {console.log("❌ You cannot vote for your own part. Vote skipped.");continue;}
+          break;
+        }
+        room.votes[voter] = cat;
+        updateRoom(roomCode, room);
       }
-      votes[voter] = cat;
     }
 
     // Tally
@@ -80,6 +125,12 @@ export async function runGame(room, rl) {
     console.table(scores);
 
     history.push({ round: r, sentence, pointsPerCategory });
+
+    // clean up stored polling data.
+    delete room.submissions;
+    delete room.votes;
+  updateRoom(roomCode, room);
+
   }
 
   // Game end

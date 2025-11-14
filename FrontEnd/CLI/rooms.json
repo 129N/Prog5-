@@ -5,6 +5,18 @@
       "test1",
       "test2"
     ],
-    "maxRounds": 3
+    "maxRounds": 3,
+    "submissions": {
+      "WHEN": {
+        "author": "test1",
+        "text": "2 years ago"
+      },
+      "WHO": {
+        "author": "test1",
+        "text": "a guy"
+      }
+    },
+    "gameState": "started",
+    "votes": {}
   }
 }
