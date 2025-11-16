@@ -1,22 +1,20 @@
 {
-  "PL58K": {
-    "host": "test1",
+  "VNM57": {
+    "host": "test2",
     "players": [
-      "test1",
       "test2"
     ],
     "maxRounds": 3,
-    "submissions": {
-      "WHEN": {
-        "author": "test1",
-        "text": "2 years ago"
-      },
-      "WHO": {
-        "author": "test1",
-        "text": "a guy"
-      }
-    },
     "gameState": "started",
+    "currentRound": 2,
+    "submissions": {},
     "votes": {}
+  },
+  "2Y5S2": {
+    "host": "test1",
+    "players": [
+      "test1"
+    ],
+    "maxRounds": 3
   }
 }

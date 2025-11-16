@@ -17,9 +17,25 @@ const io = new Server(server, {
 });
 
 
+
 //game = {roomId: { players: [names], scores: {name: points}, messages: [] }};
 
 const gamerooms = {};
+
+//room updates 
+function broadcastRoomUpdates (io, roomId) {
+  const broadCastRoom = gamerooms[roomId];
+
+  if(!broadCastRoom)return;
+//room update 
+    io.to(roomId).emit('room_update',{
+        players: broadCastRoom.players,
+        assignments: broadCastRoom.assignments || {},
+        currentRound: broadCastRoom.currentRound || 0,
+        state: broadCastRoom.state || "waiting",
+    });
+
+}
 
 // make the words players need to use in the game.
 const CATS = ["WHEN", "WHERE", "WHO", "WHAT"];
@@ -97,8 +113,39 @@ io.on('connection', (socket)=> {
 
         // sends this msg
          io.to(roomId).emit('system_message', `${username} joined the game.`);
+
+         broadcastRoomUpdates(io, roomId);
     } );
 
+
+
+//play game, 
+    socket.on ('game_start', (roomId) => {
+
+    const GMstartroom = gamerooms[roomId];
+    if (!GMstartroom) return;
+
+    GMstartroom.state = "playing";
+
+    io.to(roomId).emit("game_start", {
+      players: GMstartroom.players, 
+    });
+
+      broadcastRoomUpdates(io, roomId);
+    });
+
+//submit the word 
+socket.on('submit_word', ({roomId, cat, text, username}) =>{
+
+  const SBroom = gamerooms[roomId];
+  if(!SBroom) return;
+
+  SBroom.submissions = SBroom.submissions || {};
+  SBroom.submissions[cat] = {text, username};
+
+  broadcastRoomUpdates(io, roomId);
+
+});
 
 //send msg 
 socket.on('send_message', ({roomId, username, text}) =>{
@@ -119,6 +166,21 @@ socket.on('send_message', ({roomId, username, text}) =>{
     io.to(roomId).emit('update_scores', gamerooms[roomId].scores);
   });
 
+
+// when someone leave room, 
+socket.on("leave_room", ({ roomId, username }) => {
+    socket.leave(roomId);
+
+    // rooms[roomId].players = rooms[roomId].players.filter(p => p !== username);
+  const room = gamerooms[roomId];
+    if (!room) return;
+
+    room.players = room.players.filter((p) => p !== username);
+    broadcastRoomUpdates(io, roomId);
+});
+
+
+  //disconecct 
     socket.on('disconnect', ()=> {
         console.log(`❌ Client disconnected: ${socket.id}`);  
     });

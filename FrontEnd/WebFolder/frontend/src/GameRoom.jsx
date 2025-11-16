@@ -36,7 +36,12 @@ export default function Gameroom() {
     }
   }
 
+
+  // this is main useEffect
 useEffect(() => {
+  if(!socket) return;
+  if(!roomId || !username) return;
+
   socket.on("connect", () => console.log("✅ Connected to Room Service"));
 
   if (username && roomId) {
@@ -49,10 +54,24 @@ useEffect(() => {
 
   socket.on("update_players", (list) => setPlayers(list));
 
+
+  // this is the main frame to run the game.
+  socket.on("room_update", (data)=> {
+    setPlayers(data.players);
+    // not created yet with const
+    setAssignments(data.assignments || {});
+    setRound(data.currentRound);
+    setGameState(data.state);
+  })
+
+  // when host starts game
   socket.on("game_start", (data) => {
-    const list = Array.isArray(data) ? data  : data.players;
-    setPlayers(list);
+    console.log("🎮 Game started!");
     console.log("🎮 Players in this game:", list);
+    const list = Array.isArray(data) ? data  : data.players;
+    setPlayers(data.list);
+    setGameState("assignment"); 
+
   });
 
   return () => {
@@ -62,7 +81,7 @@ useEffect(() => {
     socket.off("player_ready_join");
     socket.off("game_start");
   };
-}, [roomId, username]);
+}, [roomId, username, socket]);
 
     return(
 
@@ -82,6 +101,9 @@ useEffect(() => {
                   })}
 
                 </div>
+
+  // Game content is here.
+
 
               ) : (
                 <p>🕓 Waiting for players...</p>
