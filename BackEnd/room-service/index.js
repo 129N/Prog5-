@@ -12,6 +12,7 @@ import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import { validate as uuidValidate } from "uuid";
+import { hostname } from "os";
 
 const app = express();
 app.use(cors());
@@ -63,7 +64,8 @@ app.post('/create', (req, res)=> {
       success: true,
       roomId,
       roomName,
-      host: username,
+      hostId: userId,   // ✔ store host userId
+      hostname: username
     });
         console.log(`🏠 Room created: ${roomName} (${roomId})`);
     }
@@ -81,7 +83,7 @@ io.on('connection', (socket)=> {
     //join, chat, leave. 
 
     //username is shared with user-service? 
-    socket.on('join_room', ({roomId, token}) => {
+    socket.on('join_room', ({roomId, token, sessionId }) => {
     try{    
       
       const decoded = jwt.verify(token, SECRET_KEY);
@@ -93,12 +95,12 @@ io.on('connection', (socket)=> {
         socket.emit("error", { message: "Invalid token payload" });
         return;
       }
-  //1 : check validation
+//1 : check validation
       if(!uuidValidate(roomId)){
         socket.emit('error', { message: 'BE : Invalid room ID format' });
         return;
       }
-      //2 : after the Id is valid, checks the room being.
+//2 : after the Id is valid, checks the room being.
       const room = rooms[roomId];
         if(!room){
             socket.emit('error', { message: 'BE : Room not found' });
@@ -108,39 +110,39 @@ io.on('connection', (socket)=> {
         if(!Array.isArray(room.players)){ room.players = []; }
 
  // ✅ If the same userId already exists, allow rejoin
-  const existingPlayer = room.players.find(p => p.userId === userId);
+  const existingPlayer = room.players.find(p => p.userId === userId && p.sessionId === sessionId);
 
   if(existingPlayer){
     existingPlayer.socketId = socket.id; // update socket binding
-    socket.join(roomId);
-    socket.username = username;
-    socket.userId = userId;
+    // socket.join(roomId);
+    // socket.username = username;
+    // socket.userId = userId;
 
-    console.log(`♻️ ${username} reconnected to room ${userId}`);
-    io.to(roomId).emit("system_message", `${username} reconnected.`);
-    io.to(roomId).emit("update_players", room.players);
-    socket.emit("join_success", { roomId, username: username });
+    // console.log(`♻️ ${username} reconnected to room ${userId}`);
+    // io.to(roomId).emit("system_message", `${username} reconnected.`);
+    // io.to(roomId).emit("update_players", room.players);
+    // socket.emit("join_success", { roomId, username: username, host: room.host,});
     return;
   }
 
-    //continue only if the room exist
-    const duplicateName = room.players.some( p => p.username === username && p.userId !== userId);
-    if(duplicateName){
-      socket.emit("error", { message: 'Username already taken in this room' });
-      return;
-    }
+//continue only if the room exist
+    // const duplicateName = room.players.some( p => p.username === username && p.userId !== userId);
+    // if(duplicateName){
+    //   socket.emit("error", { message: 'Username already taken in this room' });
+    //   return;
+    // }
 
 // ✅ Add player object with socket.id
-        const player = {userId ,userId, socketId: socket.id};
-        room.players.push(player);
+const newplayer = { userId: userId, username: username, sessionId : sessionId, socketId: socket.id };
+        room.players.push(newplayer);
         
-  // ✅ 4. Valid join — proceed
+// ✅ 4. Valid join — proceed
         socket.join(roomId);
         socket.username = username;
         socket.userId = userId;
 
         console.log(`👥 ${username} joined room ${userId}`);
-        socket.emit('join_success', { roomId, username });
+socket.emit('join_success', { roomId, username,host: room.host });
 
 
         io.to(roomId).emit('system_message', `${username} joined the room.`);
@@ -151,7 +153,7 @@ io.on('connection', (socket)=> {
         }
     });
 
-    //chat system 
+//chat system 
     socket.on('chat_message', ({roomId, message}) => 
     {
       const room = rooms[roomId];  
@@ -171,51 +173,88 @@ io.on('connection', (socket)=> {
         console.log(`💬 ${socket.username} in ${roomId}: ${message}`);
     });
 
-       socket.on("player_ready", async ({roomId, username, ready}) => {
+// player and Host ready condition
+    socket.on("player_ready", async ({roomId, username, ready}) => {
        const room = rooms[roomId];
-        if(!room){
-          socket.emit('error', { message: 'Room not found' });
-          return;
-        }
+      if(!room){
+        socket.emit('error', { message: 'Room not found' });
+        return;
+      }
 
-        if(!room.readyPlayers) {
-          room.readyPlayers = new Set();
-        }
+// Create set if missing
+      if(!room.readyPlayers) {
+        room.readyPlayers = new Set();
+      }
 
-        if(ready){
-          room.readyPlayers.add(username);
-        }else{
-          room.readyPlayers.delete(username);
-        }
+      if(ready){room.readyPlayers.add(username);} 
+      else{room.readyPlayers.delete(username); }
 
       io.to(roomId).emit(
       "system_message",
       `${username} is ${ready ? "ready" : "not ready"}.`
       );
       
-     // ✅ If all players ready → trigger GameRules Service
-    if (room.readyPlayers.size === room.players.length) {
-     console.log(`✅ All players ready in ${roomId}. Starting game...`);
-      try {
-        const res = await fetch("http://localhost:3003/start", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ roomId, players: room.players }),
-        });
 
-        const data = await res.json();
-        console.log("🎮 GameRules Service response:", data);
+  // Broadcast ready status to update UI
+    io.to(roomId).emit("ready_update", {
+      readyPlayers: Array.from(room.readyPlayers),
+      totalPlayers: room.players.length,
+    });
 
-        io.to(roomId).emit("system_message", "🎮 Game starting!");
-        io.to(roomId).emit("game_start", room.players);
-      } catch (err) {
-        console.error("❌ Error starting game:", err);
-        console.error("the port has not created yet !!");
-        io.to(roomId).emit("system messgae", "Failed to start game");
-      }
+  });
+
+
+  socket.on ("host_start_game", async({ roomId, username }) => {
+    const room = rooms[roomId];
+
+    if (!room) {
+    socket.emit("error", { message: "Room not found" });
+    return;}
+
+ // Ensure ONLY host can press start
+  if (room.host !== username) {
+    socket.emit("error", { message: "Only the host can start the game." });
+    return;
   }
 
+// Ensure ALL players are ready 
+  if (!room.readyPlayers || room.readyPlayers.size !== room.players.length) {
+    socket.emit("error", { message: "Not all players are ready." });
+    return;
+  }
+
+  console.log(`🚀 Host ${username} is starting game in room ${roomId}`);
+  console.log(`✅ All players ready in ${roomId}. Starting game...`);
+
+ // Tell FE that navigation should start
+  io.to(roomId).emit("game_start", {
+    roomId,
+    players: room.players,
+  });
+try {
+    const res = await fetch("http://localhost:3003/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId, players: room.players }),
     });
+
+      const data = await res.json();
+      console.log("🎮 GameRules Service response:", data);
+
+      io.to(roomId).emit("system_message", "🎮 Game starting!");
+      io.to(roomId).emit("game_start", room.players);
+
+      } catch (err) {
+      console.error("❌ Error starting game:", err);
+      console.error("the port has not created yet !!");
+      io.to(roomId).emit("system messgae", "Failed to start game");
+    }
+
+
+  });
+
+
+
     
 
 socket.on('leave_room', ({ roomId }) => {
@@ -258,10 +297,6 @@ socket.on('leave_room', ({ roomId }) => {
 
 });
 
-
-    // socket.on('disconnect', ()=> {
-    //     console.log(`❌ Client disconnected: ${socket.id}`);  
-    // });
 
 app.get('/', (req, res) => {
     res.send(`User room is running on ${port}`);

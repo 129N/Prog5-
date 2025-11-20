@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 import './App.css'
 import{ io }from "socket.io-client";
 import { useNavigate } from 'react-router-dom';
-
+import { v4 as uuidv4} from  'uuid';
 
 // temporary the localhost is used/
 const socket = io("http://localhost:3002", {transports: ["websocket"]});
@@ -24,6 +24,11 @@ const navigate = useNavigate();
     // 🧹 Clear all old user/session data
     localStorage.clear();
     console.log("🧹 Cleared localStorage for a clean start");
+
+     // 🔥 per-tab session
+  const sessionId = uuidv4();
+  localStorage.setItem("sessionId", sessionId);
+  console.log("🆔 Tab sessionId:", sessionId);
   }, []); // ✅ runs only once when the app first loads
 
 

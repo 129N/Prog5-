@@ -39,14 +39,32 @@ export default function LobbyRoom(){
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [isReady, setIsReady] = useState(false);
 
-  const [host, setHost] = useState(localStorage.getItem("host") || "");
+  const [host, setHost] = useState( () => localStorage.getItem("host") || "");
+
+  const userId = localStorage.getItem("userId");
+const hostId = localStorage.getItem("hostId");
+const isHost = (userId === hostId);
+
+
   const [roomData, setRoomData] = useState<RoomData | null>(null);
+// from server later:
+const [allReady, setAllReady] = useState(false);
 
   const navigate = useNavigate();
 
 
+//activate navigatiing to the game room 
 useEffect(() => {
-// 
+   if (!socket) return;
+
+  socket.on("game_start", (data) => {
+      console.log("🎮 Game starting!", data);
+      navigate(`/Gameroom/${roomId}`);
+    });
+    return () => {socket.off("game_start")};
+}, [socket, roomId, username, host]);
+
+useEffect(() => {
 
 const init = async() => {
   const validToken = await getValidToken();
@@ -63,9 +81,7 @@ init();
     if (!username || !roomId) {
     return
   }
-  //   if(roomId && username){
-  //     socket.emit("join_room", { roomId, token }); //should be parsed token, not the username.
-  // };
+
 
 
   socket.on("chat_message", (msg) =>
@@ -115,17 +131,14 @@ init();
   };
 
 
-  const Gameroom = async() =>{
+  const handleHostStart = async() =>{
 
     if(!roomId || !username){
       alert("Please fill the blunk!");
       return;
     }
-
     try{
-
       const res = await fetch("http://localhost:3003/status");
-
       if(!res.ok){
         throw new Error(`Game service not responding (status ${res.status})`);
       }
@@ -133,7 +146,8 @@ init();
       const data = await res.json();
     if (data.status === "ok") {
       alert("✅ Game Service is active! Moving to game room...");
-      navigate(`/Gameroom/${roomId}`);
+      // navigate(`/Gameroom/${roomId}`);
+      socket.emit("host_start_game", { roomId, username });
     } else {
       alert("⚠️ Game Service is responding but not ready yet.");
     }
@@ -142,8 +156,6 @@ init();
       console.error("❌ Game service unavailable:", err);
       alert("❌ GameRules Service (port 3003) is not active. Please start it first.");
     }
-
-  navigate(`/Gameroom/${roomId}`);
 
   };
 
@@ -252,11 +264,17 @@ if (roomId) loadRoom();
             onChange={(e) => setMessageInput(e.target.value)}
           />
           <button onClick={sendMSG}>Send</button>
-          <input type="button" value="ready?"  onClick={handleReady}/>
 
-             
-          {isReady ? (<button onClick={Gameroom}>GameRoom</button>
-          ) : ("🕒 Not Ready")}
+
+  {isHost ?
+  <button onClick={handleHostStart} disabled={!allReady} >
+    {allReady ? "🚀 Start Game" : "⏳ Waiting for players..."}
+  </button> 
+  : <button onClick={handleReady}>
+      {isReady ? "✅ Ready (click to cancel)" : "🟡 Ready up"}
+    </button>
+  }
+
 
 
           <button onClick={leaveRoom}>Leave</button>

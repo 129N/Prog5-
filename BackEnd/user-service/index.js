@@ -54,12 +54,12 @@ app.post('/login', (req, res) => {
   if (!username || username.trim() === "") {
     return res.status(400).json({ success: false, message: "Username is required" });
   }
-
-    if(users[username]) {
-        console.log(`♻️ Existing user logged in again: ${username}`);
+    const userId = uuidv4();
+    if(users[userId]) {
+        console.log(`♻️ Existing user logged in again: ${username} & ${userId}`);
         return res.json({success:true, user:users[username]});
     }
-    const userId = uuidv4();
+
 
     //create two tokens to prevent using an expiration token.
     const token = jwt.sign({username, userId}, SECRET_KEY, {expiresIn : "15m" });

@@ -54,7 +54,54 @@ const chooseRandom = (players, round) => {
   };
 };
 
-const allSubmitted = (sub) => CATS.every(c => typeof sub[c] === "string" && sub[c].trim().length > 0);
+function finishRound(roomId){
+  const room = gamerooms[roomId];
+  const totalThumbs = room.thumbcount || 0;
+
+
+  const authors = room.assignments;
+
+  for(let cat of CATS){
+    const author = authors[cat];
+    room.scores[author] = (room.scores[author] || 0) + totalThumbs;
+  }
+
+  io.to(roomId).emit("round_end", {
+    summary: totalThumbs,
+    scores: room.scores,
+  });
+
+  //reset 
+  room.thumbcount = 0;
+  room.doneUsers = {};
+  room.submissions = {};
+
+   // Advance to next round
+  room.currentRound++;
+
+  //If game is over,
+   if (room.currentRound > room.maxRounds) {
+    io.to(roomId).emit("game_over", {
+      scores: room.scores
+    });
+    return;
+  }
+
+   // New assignments
+  room.assignments = chooseRandom(room.players, room.currentRound - 1);
+
+  // 🔥 Start next round
+  io.to(roomId).emit("round_start", {
+    round: room.currentRound,
+    assignments: room.assignments,
+    categories: CATS,
+  });
+room.state = "assignment";
+broadcastRoomUpdates(io, roomId);
+
+}
+
+//const allSubmitted = (sub) => CATS.every(c => typeof sub[c] === "string" && sub[c].trim().length > 0);
 const makeSentence = (s) =>
   `${s.WHEN}, ${s.WHERE}, ${s.WHO}, ${s.WHAT}.`;
 
@@ -75,10 +122,11 @@ app.post('/start',(req, res)=> {
   gamerooms[roomId] ={
     roomId,
     players: players.map(p=> ({userId: p.userId, username: p.username})),
-    round: 1, 
+    currentRound: 1, 
+    maxRounds,
     //scores: players.reduce((acc, p) => ({ ...acc, [p]: 0 }), {}), //
     scores: Object.fromEntries(players.map(p => [p.userId, 0])),
-    assignments : chooseRandom(players, 0), 
+assignments : chooseRandom(players, 0), //    assignments : chooseRandom(gamerooms[roomId].players, 0),
     submissions: {},
     votes: {},
     history: [],
@@ -86,8 +134,8 @@ app.post('/start',(req, res)=> {
   };
 
   io.to(roomId).emit("round_start", {
-    round: gamerooms[roomId].round,
-    maxRounds,
+    round: gamerooms[roomId].currentRound,
+    assignments: gamerooms[roomId].assignments,
     categories: CATS,
   });
 
@@ -117,7 +165,7 @@ io.on('connection', (socket)=> {
          broadcastRoomUpdates(io, roomId);
     } );
 
-
+//room update 
 
 //play game, 
     socket.on ('game_start', (roomId) => {
@@ -137,11 +185,28 @@ io.on('connection', (socket)=> {
 //submit the word 
 socket.on('submit_word', ({roomId, cat, text, username}) =>{
 
-  const SBroom = gamerooms[roomId];
-  if(!SBroom) return;
+  const room = gamerooms[roomId];
+  if(!room) return;
 
-  SBroom.submissions = SBroom.submissions || {};
-  SBroom.submissions[cat] = {text, username};
+  room.submissions = room.submissions || {};
+  room.submissions[cat] = {text, username};
+  // All categories submitted?
+ if (CATS.every(c => room.submissions[c])) {
+    // Build sentence
+    const sentence = makeSentence({
+      WHEN: room.submissions.WHEN.text,
+      WHERE: room.submissions.WHERE.text,
+      WHO: room.submissions.WHO.text,
+      WHAT: room.submissions.WHAT.text
+    });
+
+    // Send to all FE
+    io.to(roomId).emit("sentence_ready", {
+      sentence,
+      submissions: room.submissions,
+      assignments: room.assignments,
+    });
+  }
 
   broadcastRoomUpdates(io, roomId);
 
@@ -156,15 +221,41 @@ socket.on('send_message', ({roomId, username, text}) =>{
     console.log(`${username} sent ${text}`);
 });
 
+//decalre the starting the vote
+socket.on("start_thumbs", ({ roomId }) => {
+  const room = gamerooms[roomId];
+  if (!room) return;
+
+  room.state = "thumbs";
+  broadcastRoomUpdates(io, roomId);
+});
+
+
 // Simple scoring system (thumb up)
-  socket.on('add_point', ({ roomId, target }) => {
-    if (!gamerooms[roomId] || !gamerooms[roomId].scores[target]) return;
+  socket.on('thumb_click', ({ roomId, username }) => {
+    const room = gamerooms[roomId];
+    if(!room) return;
 
-    gamerooms[roomId].scores[target] += 1;
-    console.log(`🏆 ${target} now has ${gamerooms[roomId].scores[target]} points`);
+     room.thumbcount = (room.thumbcount || 0) + 1;
 
-    io.to(roomId).emit('update_scores', gamerooms[roomId].scores);
+     io.to(roomId).emit("thumb_live_update", room.thumbcount);
+      broadcastRoomUpdates(io, roomId);
   });
+
+// User finishes voting
+socket.on("thumb_done", ({ roomId, username }) => {
+  const room = gamerooms[roomId];
+  if (!room) return;
+
+  room.doneUsers = room.doneUsers || {};
+  room.doneUsers[username] = true;
+
+  //stores 
+  if (Object.keys(room.doneUsers).length === room.players.length) {
+    finishRound(roomId);
+  }
+});
+
 
 
 // when someone leave room, 
@@ -175,7 +266,7 @@ socket.on("leave_room", ({ roomId, username }) => {
   const room = gamerooms[roomId];
     if (!room) return;
 
-    room.players = room.players.filter((p) => p !== username);
+    room.players = room.players.filter(p => p.username !== username);
     broadcastRoomUpdates(io, roomId);
 });
 

@@ -76,9 +76,10 @@ const navigate = useNavigate();
 
 
   useEffect(()=>{
-    socket.on("join_success",({roomId})=>{
+    socket.on("join_success",({roomId, username, host})=>{
       console.log("✅ Successfully joined room:", roomId);
       setJoining(false);
+      localStorage.setItem("host", host);  
     navigate(`/room/${roomId}`);
     });
 
@@ -117,17 +118,20 @@ const navigate = useNavigate();
 
          // Save username globally before navigation
 
-        // setUserName(username);
+
         setRoomId(data.roomId); // optional: auto-fill roomId field
         setRoomName(data.roomName);
         setRoom(room);
         setHost(data.host);
-        localStorage.setItem("host", JSON.stringify(data.host)); // optional, for later use
+localStorage.setItem("hostId", data.hostId);
+localStorage.setItem("hostName", data.hostName);
+
+
 
         //toggle function
         setCreated(true);
 
-        socket.emit("join_room", { roomId: data.roomId, token });
+        socket.emit("join_room", { roomId: data.roomId, token: localStorage.getItem("token"), sessionId: localStorage.getItem("sessionId"), });
       }
 
     }
@@ -140,7 +144,7 @@ const navigate = useNavigate();
 
   const handleLogin = async()=> {
 
-          const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token");
     //checks the blank
     if(!roomId){
       alert("Please fill the blunk!");
@@ -150,7 +154,7 @@ const navigate = useNavigate();
     // open the useEffect and the typed id will sent to the backend.
     else{
       setJoining(true);
-      socket.emit("join_room", { roomId, token });  // username from localStorage
+      socket.emit("join_room", { roomId, token, sessionId: localStorage.getItem("sessionId"),  });  // username from localStorage
       setTimeout(() => setJoining(false), 3000);
     }
  
