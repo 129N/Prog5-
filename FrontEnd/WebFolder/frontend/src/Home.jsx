@@ -77,10 +77,15 @@ const navigate = useNavigate();
 
   useEffect(()=>{
     socket.on("join_success",({roomId, username, host})=>{
-      console.log("✅ Successfully joined room:", roomId);
       setJoining(false);
-      localStorage.setItem("host", host);  
-    navigate(`/room/${roomId}`);
+      localStorage.setItem("roomId", roomId);
+      console.log("✅ Successfully joined room:", roomId)
+       if(host) {
+          localStorage.setItem("hostId", host.userId);
+          localStorage.setItem("hostName", host.username);
+          console.log("Host Debug:", host.userId, host.username);
+        } 
+      navigate(`/room/${roomId}`);
     });
 
     socket.on("error", (err)=>{
@@ -117,16 +122,17 @@ const navigate = useNavigate();
         alert(`Room ${data.roomName} created successfully!`);
 
          // Save username globally before navigation
-
-
-        setRoomId(data.roomId); // optional: auto-fill roomId field
+        setRoomId(data.roomId); 
         setRoomName(data.roomName);
-        setRoom(room);
-        setHost(data.host);
-localStorage.setItem("hostId", data.hostId);
-localStorage.setItem("hostName", data.hostName);
-
-
+        setRoom(data.room);
+        //set the room
+        localStorage.setItem("roomId", data.roomId);
+        const {host} = data;
+        if(host) {
+          localStorage.setItem("hostId", host.userId);
+          localStorage.setItem("hostName", host.username);
+        }
+        setHost(host);
 
         //toggle function
         setCreated(true);
@@ -141,7 +147,8 @@ localStorage.setItem("hostName", data.hostName);
     }
 
   };
-
+  
+//join the room
   const handleLogin = async()=> {
 
     const token = localStorage.getItem("token");

@@ -56,8 +56,8 @@ app.post('/create', (req, res)=> {
   
     const roomId = uuidv4();
     rooms[roomId] = {id : roomId, name : roomName, host:{username, userId}, 
-    players:[{username, userId}], messages: []};
-
+    players:[{username, userId}], readyPlayers: new Set([username]), messages: []};
+//host auto ready
     console.log(`🏠 Room created by ${username} (${userId}) — ${roomName} (${roomId})`);
 
     res.json({
@@ -85,12 +85,12 @@ io.on('connection', (socket)=> {
     //username is shared with user-service? 
     socket.on('join_room', ({roomId, token, sessionId }) => {
     try{    
-      
       const decoded = jwt.verify(token, SECRET_KEY);
       const username = (decoded.username || "").trim();
       const userId = decoded.userId;
-      console.log("✅ Token decoded:", { username, userId, roomId });
 
+      console.log("✅ Token decoded:", { username, userId, roomId });
+      // console.log("👥 Current players in room:", room.players.map(p => p.username));
       if (!username || !userId) {
         socket.emit("error", { message: "Invalid token payload" });
         return;
@@ -110,31 +110,26 @@ io.on('connection', (socket)=> {
         if(!Array.isArray(room.players)){ room.players = []; }
 
  // ✅ If the same userId already exists, allow rejoin
-  const existingPlayer = room.players.find(p => p.userId === userId && p.sessionId === sessionId);
+const existingPlayer = room.players.find(p => p.userId === userId);
 
-  if(existingPlayer){
-    existingPlayer.socketId = socket.id; // update socket binding
-    // socket.join(roomId);
-    // socket.username = username;
-    // socket.userId = userId;
+if (existingPlayer) {
+  existingPlayer.socketId = socket.id;
+  console.log(`♻️ ${username} reconnected to room ${roomId}`);
+} else {
+  room.players.push({ userId, username, socketId: socket.id });
+  console.log(`👥 NEW USER!! \n ${username} joined room ${roomId}`);
+}
 
-    // console.log(`♻️ ${username} reconnected to room ${userId}`);
-    // io.to(roomId).emit("system_message", `${username} reconnected.`);
-    // io.to(roomId).emit("update_players", room.players);
-    // socket.emit("join_success", { roomId, username: username, host: room.host,});
-    return;
-  }
+if (room.readyPlayers) {
+  room.readyPlayers = new Set(
+    Array.from(room.readyPlayers).filter(u => room.players.some(p => p.username === u))
+  );
+}
 
-//continue only if the room exist
-    // const duplicateName = room.players.some( p => p.username === username && p.userId !== userId);
-    // if(duplicateName){
-    //   socket.emit("error", { message: 'Username already taken in this room' });
-    //   return;
-    // }
 
 // ✅ Add player object with socket.id
-const newplayer = { userId: userId, username: username, sessionId : sessionId, socketId: socket.id };
-        room.players.push(newplayer);
+        // const newplayer = { userId: userId, username: username, socketId: socket.id };
+        // room.players.push(newplayer);
         
 // ✅ 4. Valid join — proceed
         socket.join(roomId);
@@ -142,11 +137,19 @@ const newplayer = { userId: userId, username: username, sessionId : sessionId, s
         socket.userId = userId;
 
         console.log(`👥 ${username} joined room ${userId}`);
-socket.emit('join_success', { roomId, username,host: room.host });
-
+// join room success
+socket.emit('join_success',{
+ roomId,
+  username,
+  host: {
+    userId: room.host.userId,
+    username: room.host.username
+  }
+});
 
         io.to(roomId).emit('system_message', `${username} joined the room.`);
         io.to(roomId).emit('update_players', room.players); // const room = rooms[roomId];
+      console.log(　"👥 Current players:",room.players.map(p => p.username) );
       } catch(err){
           console.error("JWT verification failed:", err);
           socket.emit('error', { message: 'Invalid or expired token' });
@@ -173,7 +176,7 @@ socket.emit('join_success', { roomId, username,host: room.host });
         console.log(`💬 ${socket.username} in ${roomId}: ${message}`);
     });
 
-// player and Host ready condition
+// player (Non-host) ready condition
     socket.on("player_ready", async ({roomId, username, ready}) => {
        const room = rooms[roomId];
       if(!room){
@@ -186,22 +189,31 @@ socket.emit('join_success', { roomId, username,host: room.host });
         room.readyPlayers = new Set();
       }
 
-      if(ready){room.readyPlayers.add(username);} 
-      else{room.readyPlayers.delete(username); }
+      if(ready){room.readyPlayers.add(socket.userId);} 
+      else{room.readyPlayers.delete(socket.userId); }
 
       io.to(roomId).emit(
       "system_message",
       `${username} is ${ready ? "ready" : "not ready"}.`
       );
       
-
   // Broadcast ready status to update UI
     io.to(roomId).emit("ready_update", {
       readyPlayers: Array.from(room.readyPlayers),
       totalPlayers: room.players.length,
     });
-
+      console.log(`[READY] ${username}: ${ready} (${room.readyPlayers.size}/${room.players.length})`);
   });
+
+socket.on("get_ready_state", ({ roomId }) => {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  io.to(socket.id).emit("ready_update", {
+    readyPlayers: Array.from(room.readyPlayers || []),
+    totalPlayers: room.players.length
+  });
+});
 
 
   socket.on ("host_start_game", async({ roomId, username }) => {
@@ -212,7 +224,7 @@ socket.emit('join_success', { roomId, username,host: room.host });
     return;}
 
  // Ensure ONLY host can press start
-  if (room.host !== username) {
+  if (room.host.userId !== socket.userId) {
     socket.emit("error", { message: "Only the host can start the game." });
     return;
   }
@@ -242,7 +254,7 @@ try {
       console.log("🎮 GameRules Service response:", data);
 
       io.to(roomId).emit("system_message", "🎮 Game starting!");
-      io.to(roomId).emit("game_start", room.players);
+      // io.to(roomId).emit("game_start", room.players);
 
       } catch (err) {
       console.error("❌ Error starting game:", err);
@@ -252,9 +264,6 @@ try {
 
 
   });
-
-
-
     
 
 socket.on('leave_room', ({ roomId }) => {
@@ -281,19 +290,23 @@ socket.on('leave_room', ({ roomId }) => {
 
 
     //disconnect
-    socket.on("disconnect", () => {
-      for (const roomId in rooms) {
-        const room = rooms[roomId];
-        if (!room.players) continue;
-        const idx = room.players.findIndex(p =>p.socketId === socket.id);
-        if(idx !== -1){
-          const [left] = room.players.splice(idx, 1);
-          console.log(`❌ ${left.username} disconnected from ${roomId}`);
-          io.to(roomId).emit("system_message", `${left.username} left the room.`);
-          io.to(roomId).emit("update_players", room.players);
-        }
-      }
-    });
+socket.on("disconnect", () => {
+  for (const roomId in rooms) {
+    const room = rooms[roomId];
+    if (!room.players) continue;
+
+    const idx = room.players.findIndex(p => p.socketId === socket.id);
+    if (idx !== -1) {
+      const [left] = room.players.splice(idx, 1);
+      console.log(`❌ ${left.username} disconnected from ${roomId}`);
+      io.to(roomId).emit("update_players", room.players);
+
+      // 🧹 optional: clear ready status
+      if (room.readyPlayers) room.readyPlayers.delete(left.userId);
+    }
+  }
+});
+
 
 });
 

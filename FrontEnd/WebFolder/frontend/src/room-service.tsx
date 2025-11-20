@@ -26,6 +26,10 @@ interface RoomData {
   players: Player[];
 }
 
+interface GameStartData {
+  roomId: string;
+  players: { username: string; userId: string }[];
+}
 export default function LobbyRoom(){
 
   const { roomId } = useParams();  //from index.js of user-service 
@@ -38,12 +42,13 @@ export default function LobbyRoom(){
 
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [isReady, setIsReady] = useState(false);
-
+const [ReadyPlayer ,setReadyPlayers] = useState([]);
+const [totalPlayers, setTotalPlayers] = useState(0);
   const [host, setHost] = useState( () => localStorage.getItem("host") || "");
 
   const userId = localStorage.getItem("userId");
-const hostId = localStorage.getItem("hostId");
-const isHost = (userId === hostId);
+  const hostId = localStorage.getItem("hostId");
+  const isHost = (userId === hostId);
 
 
   const [roomData, setRoomData] = useState<RoomData | null>(null);
@@ -57,12 +62,14 @@ const [allReady, setAllReady] = useState(false);
 useEffect(() => {
    if (!socket) return;
 
-  socket.on("game_start", (data) => {
-      console.log("🎮 Game starting!", data);
-      navigate(`/Gameroom/${roomId}`);
-    });
-    return () => {socket.off("game_start")};
-}, [socket, roomId, username, host]);
+ const handleGameStart = (data : GameStartData) => {
+    console.log("🎮 Game starting!", data);
+    navigate(`/Gameroom/${data.roomId}`);
+  };
+
+  socket.on("game_start", handleGameStart);
+    return () => {socket.off("game_start", handleGameStart)};
+}, [navigate]);
 
 useEffect(() => {
 
@@ -82,8 +89,6 @@ init();
     return
   }
 
-
-
   socket.on("chat_message", (msg) =>
     setMessages((prev) => [...prev, msg])
   );
@@ -93,7 +98,7 @@ init();
   );
 
   socket.on("update_players", (list) => 
- setPlayers(list)
+  setPlayers(list)
   );
 
   socket.on("reconnect", () => {
@@ -105,13 +110,28 @@ init();
   }
 });
 
+socket.emit("get_ready_state", { roomId });
+
+socket.on("ready_update", ({readyPlayers, totalPlayers}) =>{
+  console.log("DEBUG READY_UPDATE:", {
+    readyPlayers,
+    readyCount: readyPlayers.length,
+    totalPlayers,
+  });
+
+  setReadyPlayers(readyPlayers);
+  setTotalPlayers(totalPlayers);
+  setAllReady(readyPlayers.length === totalPlayers);
+   
+});
 
   return () => {
-    // socket.off("connect");
+
     socket.off("chat_message");
     socket.off("system_message");
     socket.off("update_players");
     socket.off("reconnect");
+    socket.off("ready_update");
   };
 }, [roomId, username, token]);
 
@@ -130,9 +150,24 @@ init();
     }
   };
 
+  const leaveRoom = async() => {
+      if (username && roomId) {
+      socket.emit("leave_room", { roomId, username });
+      navigate("/Home");
+      socket.disconnect();
+    }
+  }
 
+//ready non-host side 
+const handlePlayerReady = async() => {
+  if (!roomId || !username) return;
+    const newReady = !isReady;
+    setIsReady(newReady);
+    socket.emit("player_ready", { roomId, username, ready: newReady });
+};
+
+//ready host side 
   const handleHostStart = async() =>{
-
     if(!roomId || !username){
       alert("Please fill the blunk!");
       return;
@@ -158,45 +193,6 @@ init();
     }
 
   };
-
-
-  const leaveRoom = async() => {
-      if (username && roomId) {
-      socket.emit("leave_room", { roomId, username });
-      navigate("/Home");
-      socket.disconnect();
-    }
-  }
-
-
-const handleReady = async() => {
-
-  if (!roomId || !username) return;
-
- try{
-      const res = await fetch("http://localhost:3003/status");
-
-      if(!res.ok){
-        throw new Error(`Game service not responding (status ${res.status})`);
-      }
-
-      const data = await res.json();
-    if (data.status === "ok") {
-      alert("✅ Game Service is active! Moving to game room...");
-      const newReady = !isReady;
-    setIsReady(newReady);
-    socket.emit("player_ready", { roomId, username, ready: newReady });
-    } else {
-      alert("⚠️ Game Service is responding but not ready yet.");
-    }
-
-    }catch(err){  
-      console.error("❌ Game service unavailable:", err);
-      alert("❌ GameRules Service (port 3003) is not active. Please start it first.");
-    }
-
-};
-
 
 useEffect(() =>{
   const loadRoom = async()=>{
@@ -234,12 +230,11 @@ if (roomId) loadRoom();
             <h3>Room: {roomId}</h3>
             <div>
               <h3>Players:</h3>
-<p>
-  Players: {players.length > 0 ? players.map(p => p.username).join(", ") : "No players yet"}
-</p>
+  <p>
+    Players: {players.length > 0 ? players.map(p => p.username).join(", ") : "No players yet"}
+  </p>
 
-
-            </div>
+</div>
 
      
           <div
@@ -270,12 +265,10 @@ if (roomId) loadRoom();
   <button onClick={handleHostStart} disabled={!allReady} >
     {allReady ? "🚀 Start Game" : "⏳ Waiting for players..."}
   </button> 
-  : <button onClick={handleReady}>
+  : <button onClick={handlePlayerReady}>
       {isReady ? "✅ Ready (click to cancel)" : "🟡 Ready up"}
     </button>
   }
-
-
 
           <button onClick={leaveRoom}>Leave</button>
      </>

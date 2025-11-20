@@ -33,11 +33,21 @@ const navigate = useNavigate();
 
 
   const handleLogin = async()=> {
+  const savedToken = localStorage.getItem("token");
+  const savedUserId = localStorage.getItem("userId");
+  const savedUsername = localStorage.getItem("username");
+  // 1. If a user already has valid info, reuse it instead of re-logging
+if (savedToken && savedUserId && savedUsername) {
+    console.log("🔁 Reusing existing login:", savedUsername, savedUserId);
+    onLogin({ username: savedUsername, userId: savedUserId, token: savedToken });
+    navigate("/Home");
+    return;
+  }
+  // 2. Only call /login once (first time)
    if (!username.trim()){
      alert("Please enter a username!");
       return;
     }
-
     setLoading(true);
 
     try{
