@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react'
 import './App.css'
 import{ io }from "socket.io-client";
 import { useNavigate } from 'react-router-dom';
-
+import { LANPORT } from './GameRoom';
 
 // temporary the localhost is used/
-const socket = io("http://localhost:3002", {transports: ["websocket"]});
+const socket = io(`http://${LANPORT}:3002`, {transports: ["websocket"]});
 
 function UserService() {
 
@@ -106,7 +106,7 @@ const navigate = useNavigate();
     }
     
     try{
-        const res = await fetch("http://localhost:3002/create", {
+        const res = await fetch(`http://${LANPORT}:3002/create`, {
           method: "POST",
           headers: { "Content-Type": "application/json",
             "Authorization" : `Bearer ${token}`,

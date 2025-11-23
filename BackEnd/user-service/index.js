@@ -41,9 +41,6 @@ io.on('connection', (socket)=> {
 
 const users ={};
 
-// function generateToken(){
-//     return Math.random().toString(36).substring(2, 15);
-// }
 
 //Register or login 
 app.post('/login', (req, res) => {
@@ -111,7 +108,7 @@ app.get('/', (req, res) => {
 });
 
 
-server.listen(PORT, ()=> {
-    console.log(`✅ Service started on http://localhost:${PORT}`);
+server.listen(PORT,'0.0.0.0', ()=> {
+    console.log(`✅ Service started on  http://192.168.0.103:${PORT}`);
 });
 

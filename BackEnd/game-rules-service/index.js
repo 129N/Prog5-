@@ -7,6 +7,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
+
 //set up the port in this case the game-rule service has 3003
 const port = process.env.port || 3003;
 
@@ -331,7 +333,6 @@ app.get('/status', (req, res) => {
      res.json({ status: "ok", message: "GameRules Service is running" });
 });
 
-server.listen(port, ()=> {
-    console.log(`✅ Service started on http://localhost:${port}`);
-    // console.log(`the roomId is ${roomId}`);
+server.listen(port,'0.0.0.0' ,()=> {
+    console.log(`✅ Service started on LAn: http://192.168.0.103:${port}`);
 });

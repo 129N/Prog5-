@@ -1,0 +1,24 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+
+    "start:BE:ALL": "npm-run-all --parallel start:Room  start:Game start:User",
+
+    "install:game": "cd game-rules-service && npm install",
+    "install:room": "cd room-service && npm install",
+    "install:user": "cd user-services && npm install",
+
+    "start:Game": "cd game-rules-service && node index.js",
+    "start:Room": "cd room-service && node index.js",
+    "start:User": "cd user-service && node index.js"
+
+
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

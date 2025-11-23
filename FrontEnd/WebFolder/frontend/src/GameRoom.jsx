@@ -3,7 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 
 //import { socket } from "./socket";
 import { io } from "socket.io-client";
-export const socket = io("http://localhost:3003", {
+
+export const LANPORT = "192.168.0.103";
+export const socket = io(`http://${LANPORT}:3003`, {
   transports: ["websocket"],
 });
 

@@ -14,6 +14,10 @@ import { v4 as uuidv4 } from "uuid";
 import { validate as uuidValidate } from "uuid";
 import { hostname } from "os";
 
+
+const LAN_IP = "192.168.0.103";
+
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -223,12 +227,6 @@ socket.on("get_ready_state", ({ roomId }) => {
     socket.emit("error", { message: "Room not found" });
     return;}
 
-//  // Ensure ONLY host can press start
-//   if (room.host.userId !== socket.userId) {
-//     socket.emit("error", { message: "Only the host can start the game." });
-//     return;
-//   }
-
 // Ensure ALL players are ready 
   if (!room.readyPlayers || room.readyPlayers.size !== room.players.length) {
     const notReady = room.players.filter(p => !room.readyPlayers.has(p.userId)).map(p => p.userId);
@@ -248,7 +246,7 @@ socket.on("get_ready_state", ({ roomId }) => {
     players: room.players,
   });
 try {
-    const res = await fetch("http://localhost:3003/start", {
+    const res = await fetch(`http://${LAN_IP}:3003/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, players: room.players }),
@@ -342,6 +340,6 @@ app.get("/room/:roomId", (req, res) => {
 });
 
 
-server.listen(port, ()=> {
-    console.log(`✅ Service started on http://localhost:${port}`);
+server.listen(port, '0.0.0.0', ()=> {
+    console.log(`✅ Service started on LAN: http://192.168.0.103:${port}`);
 });

@@ -3,6 +3,7 @@ import { cache, useEffect, useState } from "react";
 import { data, useNavigate, useParams } from "react-router-dom";
 import { getValidToken } from "./auth";
 import { socket } from "./socket";
+import { LANPORT } from "./GameRoom";
 interface Message {
   username: string;
   text?: string;
@@ -179,7 +180,7 @@ const handlePlayerReady = async() => {
       return;
     }
     try{
-      const res = await fetch("http://localhost:3003/status");
+      const res = await fetch(`http://${LANPORT}:3003/status`);
       if(!res.ok){
         throw new Error(`Game service not responding (status ${res.status})`);
       }
@@ -203,7 +204,7 @@ const handlePlayerReady = async() => {
 useEffect(() =>{
   const loadRoom = async()=>{
  try {
-        const res = await fetch(`http://localhost:3002/room/${roomId}`);
+        const res = await fetch(`http://${LANPORT}:3002/room/${roomId}`);
         const data = await res.json();
         if (data.success) {
           setRoomData(data);

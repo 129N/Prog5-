@@ -4,13 +4,12 @@ import './App.css'
 import{ io }from "socket.io-client";
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4} from  'uuid';
+import { LANPORT } from './GameRoom';
 
-// temporary the localhost is used/
-const socket = io("http://localhost:3002", {transports: ["websocket"]});
+const socket = io(`http://${LANPORT}:3002`, {transports: ["websocket"]});
 
 function App_main({onLogin}) {
-
-const navigate = useNavigate();
+  const navigate = useNavigate();
 
   const [username, setUserName] = useState ("");
   const [roomId, setRoomId] = useState(""); //from index.js of user-service 
@@ -51,7 +50,7 @@ if (savedToken && savedUserId && savedUsername) {
     setLoading(true);
 
     try{
-      const res = await fetch("http://localhost:3001/login", {
+      const res = await fetch(`http://${LANPORT}:3001/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username }),
