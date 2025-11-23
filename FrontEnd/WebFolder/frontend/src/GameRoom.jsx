@@ -16,7 +16,6 @@ export default function Gameroom() {
   const [username, setUserName] = useState (localStorage.getItem("username") || "");
   const [players, setPlayers] = useState ([]);
   const [messageInput, setMessageInput] = useState({});
-  const [messages, setMessages] = useState([]);
   // FE status consts 
 
 const [roomCategories, setRoomCategories] = useState([]);
