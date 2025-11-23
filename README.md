@@ -55,7 +55,9 @@ Fully LAN compatible
 
 Prepared for CapacitorJS mobile build
 
-📦 Project Structure
+# 📦 Project Structure
+
+```bash
 Prog5/
 │
 ├── BackEnd/
@@ -73,37 +75,45 @@ Prog5/
             ├── capacitor.config.json
             ├── package.json
             └── ...
-
+```
 ⚙️ Install
 Backend
+```bash
 cd BackEnd/room-service
 npm install
 node index.js
-
+```
+```bash
 cd BackEnd/game-rules-service
 npm install
 node index.js
+```
 
 Frontend
+```bash
 cd FrontEnd/WebFolder/frontend
 npm install
 npm run dev -- --host
+```
 
 🌐 LAN Configuration
 
 To run on mobile over Wi-Fi:
 
 Frontend
+```bash
 export const LANPORT = "192.168.0.103";
 export const socket = io(`http://${LANPORT}:3003`, {
   transports: ["websocket"],
 });
+```
 
 Backend service logs
+```bash
 server.listen(port, "0.0.0.0", () => {
   console.log(`Running on http://192.168.0.103:${port}`);
 });
-
+```
 
 Ensure:
 
@@ -116,22 +126,28 @@ http://192.168.0.103:5173/
 
 📱 CapacitorJS Mobile Build
 1️⃣ Initialize Capacitor
+```bash
 npx cap init 4WGame com.game4w.app
+```
 
 2️⃣ Build frontend
+```bash
 npm run build
-
+```
 3️⃣ Copy to Capacitor
+```bash
 npx cap copy
-
+```
 4️⃣ Add platforms
+```bash
 npx cap add android
 npx cap add ios
-
+```
 5️⃣ Open platform project
+```bash
 npx cap open android
 npx cap open ios
-
+```
 
 Run simulators or real devices from Android Studio / Xcode.
 
@@ -177,3 +193,4 @@ Example:
 📘 License
 
 MIT
+
