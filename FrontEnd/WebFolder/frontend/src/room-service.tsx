@@ -125,6 +125,11 @@ socket.on("ready_update", ({readyPlayers, totalPlayers}) =>{
    
 });
 
+socket.on("not_ready_alert", (data) => {
+  alert(`⛔ Cannot start game.\nNot ready players:\n- ${data.notReady.join("\n- ")}`);
+});
+
+
   return () => {
 
     socket.off("chat_message");
@@ -132,6 +137,7 @@ socket.on("ready_update", ({readyPlayers, totalPlayers}) =>{
     socket.off("update_players");
     socket.off("reconnect");
     socket.off("ready_update");
+    socket.off("not_ready_alert");
   };
 }, [roomId, username, token]);
 
@@ -259,7 +265,6 @@ if (roomId) loadRoom();
             onChange={(e) => setMessageInput(e.target.value)}
           />
           <button onClick={sendMSG}>Send</button>
-
 
   {isHost ?
   <button onClick={handleHostStart} disabled={!allReady} >

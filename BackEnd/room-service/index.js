@@ -223,15 +223,19 @@ socket.on("get_ready_state", ({ roomId }) => {
     socket.emit("error", { message: "Room not found" });
     return;}
 
- // Ensure ONLY host can press start
-  if (room.host.userId !== socket.userId) {
-    socket.emit("error", { message: "Only the host can start the game." });
-    return;
-  }
+//  // Ensure ONLY host can press start
+//   if (room.host.userId !== socket.userId) {
+//     socket.emit("error", { message: "Only the host can start the game." });
+//     return;
+//   }
 
 // Ensure ALL players are ready 
   if (!room.readyPlayers || room.readyPlayers.size !== room.players.length) {
-    socket.emit("error", { message: "Not all players are ready." });
+    const notReady = room.players.filter(p => !room.readyPlayers.has(p.userId)).map(p => p.userId);
+    socket.emit("not_ready_alert", {
+      message: "The players are not ready yet",
+      notReady,
+    });
     return;
   }
 

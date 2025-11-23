@@ -37,7 +37,7 @@ const [history, setHistory] = useState([]);
   const leaveRoom = async() => {
       if (username && roomId) {
       socket.emit("leave_room", { roomId, username });
-      navigate("/");
+      navigate("/Home");
       socket.disconnect();
     }
   }
@@ -62,39 +62,39 @@ useEffect(() => {
 }, [cat]);
 
 
-  // this is main useEffect
-useEffect(() => {
-  if(!socket) return;
-  if(!roomId || !username) return;
+// this is main useEffect
+  useEffect(() => {
+    if(!socket) return;
+    if(!roomId || !username) return;
 
-  socket.on("connect", () => console.log("✅ Connected to Room Service"));
+    socket.on("connect", () => console.log("✅ Connected to Room Service"));
 
-  if (username && roomId) {
-    socket.emit("player_ready_join", { roomId, username });
-  }
+    if (username && roomId) {
+      socket.emit("player_ready_join", { roomId, username });
+    }
 
 
-  socket.on("room_update", (data)=> {
-    setPlayers(data.players);
-    // not created yet with const
-    setAssignments(data.assignments || {});
-    setRound(data.currentRound);
-    setGameState(data.state);
-  })
+    socket.on("room_update", (data)=> {
+      setPlayers(data.players);
+      // not created yet with const
+      setAssignments(data.assignments || {});
+      setRound(data.currentRound);
+      setGameState(data.state);
+    })
 
-//round start 
-  socket.on("round_start", (data) => {
-    console.log("🌀 New round started:", data.round);
-    setRound(data.round);
-    setAssignments(data.assignments || {});
-    setRoomCategories(data.categories || []);  // <-- FIXED
-    setGameState("assignment");
-  });
+  //round start 
+    socket.on("round_start", (data) => {
+      console.log("🌀 New round started:", data.round);
+      setRound(data.round);
+      setAssignments(data.assignments || {});
+      setRoomCategories(data.categories || []);  // <-- FIXED
+      setGameState("assignment");
+    });
 
-//Receives update lives
-socket.on("thumb_live_update", (count) => {
-  setThumbCount(count);
-});
+    //Receives update lives
+    socket.on("thumb_live_update", (count) => {
+      setThumbCount(count);
+    });
 
 
 const handleSentenceReady = (data) =>{
@@ -104,8 +104,16 @@ const handleSentenceReady = (data) =>{
   setGameState("sentence_ready");
 
 };
+
+//sentence finish
   socket.on("sentence_ready", handleSentenceReady);
 
+// alert 
+socket.on("waiting_for_players", (data) => {
+   alert(`⏳ Waiting for: ${data.notDone.join(", ")}`);
+});
+
+//Game over socket
   socket.on("game_over", (data) => {
     setScores(data.scores);
     setGameState("game_over");
@@ -115,10 +123,11 @@ const handleSentenceReady = (data) =>{
     socket.off("room_update");
     socket.off("sentence_ready", handleSentenceReady);
     socket.off("chat_message");
-   socket.off("player_ready_join");
+    socket.off("player_ready_join");
     socket.off("game_start"); //  (from room-service) → only once, when lobby says “game begins”
     socket.off("round_start");// (from game-rules) → each round, gives round + assignments
     socket.off("thumb_live_update");
+    socket.off("waiting_for_players");
     socket.off("round_end");
   };
 }, [roomId, username, socket]);
@@ -204,17 +213,6 @@ const submitAllWords = async() =>{
 
   setMessageInput({});
 
-        // socket.emit("submit_word", {
-        //   roomId,
-        //   username,
-        //   text: value.trim(),            // text: messageInput[cat],
-        //   cat: catItem,
-        // });
-
-      // setMessageInput(prev => ({
-      // ...prev,
-      // [catItem]: ""
-      // }));
 };
 
 
@@ -235,7 +233,7 @@ function SentenceResult(){
 }
 const gotoThumb = async() =>{
   socket.emit("start_thumbs", { roomId });
-  setGameState("thumbs"); // it goes to     {gameState === "thumbs" && renderThumbsPhase()}
+  setGameState("thumbs"); // it goes to {gameState === "thumbs" && renderThumbsPhase()}
 };
 
 //thumbs up phase 
@@ -246,7 +244,7 @@ function renderThumbsPhase(){
       <h3>Live score: {thumbCount}</h3>
 
       <button onClick={Thumb}>👍</button>
-      <button onClick={finishThumbs}>Done</button>
+<button onClick={finishThumbs}>Done</button> {/*  FIXED */}
     </div>
   );
 }

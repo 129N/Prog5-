@@ -283,10 +283,20 @@ socket.on("thumb_done", ({ roomId, username }) => {
   room.doneUsers = room.doneUsers || {};
   room.doneUsers[username] = true;
 
-  //stores 
-  if (Object.keys(room.doneUsers).length === room.players.length) {
-    finishRound(roomId);
+  const totalPlayers = room.players.length;
+  const finishedPlayers = Object.keys(room.doneUsers).length;
+
+
+  if(finishedPlayers < totalPlayers) {
+    const notDone =  room.players.filter(p => !room.doneUsers[p.username]).map(p => p.username);
+    socket.emit("waiting_for_players", {
+      notDone,
+      message: "Some players have not confirmed yet."
+    });
+    return;
   }
+
+    finishRound(roomId);
 });
 
 
