@@ -1,5 +1,0 @@
-package com.game4w.app;
-
-import com.getcapacitor.BridgeActivity;
-
-public class MainActivity extends BridgeActivity {}
