@@ -36,3 +36,9 @@ Thumbs.db
 
 # Capacitor output
 capacitor.config.ts
+
+AssignmentVideo.mp4
+AssignmentVideo.MP4
+AssignmentVideo.mov
+AssignmentVideo.MOV
+AssignmentVideo.*
